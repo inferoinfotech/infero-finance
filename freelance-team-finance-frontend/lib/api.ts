@@ -160,14 +160,28 @@ class ApiClient {
   }
 
   async getHourlyWorkEntries(projectId: string) {
-    return this.request(`/api/hourly-work/project/${projectId}`)
-  }
-  async createHourlyWork(entry: { project: string, date: string, hours: number, note?: string }) {
-    return this.request("/api/hourly-work", {
-      method: "POST",
-      body: JSON.stringify(entry),
-    })
-  }
+  // Returns: { logs: HourlyWorkLog[] }
+  const data = await this.request(`/api/hourly-work/project/${projectId}`)
+  return data.logs || []
+}
+
+async createHourlyWork(entry: { project: string, weekStart: string, hours: number }) {
+  return this.request("/api/hourly-work", {
+    method: "POST",
+    body: JSON.stringify(entry),
+  })
+}
+
+async updateHourlyWork(logId: string, update: { hours: number }) {
+  return this.request(`/api/hourly-work/${logId}`, {
+    method: "PUT",
+    body: JSON.stringify(update),
+  })
+}
+
+async deleteHourlyWork(logId: string) {
+  return this.request(`/api/hourly-work/${logId}`, { method: "DELETE" })
+}
   
 }
 

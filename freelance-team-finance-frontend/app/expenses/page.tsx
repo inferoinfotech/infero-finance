@@ -32,6 +32,7 @@ export default function ExpensesPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [formData, setFormData] = useState({
     type: "general",
     name: "",
@@ -46,16 +47,29 @@ export default function ExpensesPage() {
     fetchExpenses()
   }, [])
 
-  const fetchExpenses = async () => {
-    try {
-      const data = await apiClient.getExpenses()
-      setExpenses(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error("Failed to fetch expenses:", error)
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    apiClient.getAccounts().then(data => {
+      setAccounts(Array.isArray(data) ? data : (data.accounts || []));
+    });
+  }, []);
+
+const fetchExpenses = async () => {
+  try {
+    const data = await apiClient.getExpenses();
+    // SUPPORT BOTH SHAPES
+    const expensesArr = Array.isArray(data)
+      ? data
+      : Array.isArray(data.expenses)
+        ? data.expenses
+        : [];
+    setExpenses(expensesArr);
+  } catch (error) {
+    console.error("Failed to fetch expenses:", error);
+  } finally {
+    setLoading(false);
   }
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -291,6 +305,22 @@ export default function ExpensesPage() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Withdraw Account *</label>
+                  <select
+                    value={formData.withdrawAccount}
+                    onChange={e => setFormData({ ...formData, withdrawAccount: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Account</option>
+                    {accounts.map(acc => (
+                      <option key={acc._id} value={acc._id}>
+                        {acc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex gap-4">
                   <Button type="submit">Add Expense</Button>
                   <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
@@ -315,38 +345,42 @@ export default function ExpensesPage() {
             ) : (
               <div className="space-y-4">
                 {filteredExpenses.map((expense) => (
-                  <div key={expense._id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">{expense.name}</h3>
-                          <Badge className={getTypeColor(expense.type)}>{expense.type}</Badge>
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <p>
-                            Amount: {expense.currency} {expense.amount}
-                          </p>
-                          <p>Date: {new Date(expense.date).toLocaleDateString()}</p>
-                          <p>By: {expense.user.name}</p>
-                          {expense.withdrawAccount && <p>Account: {expense.withdrawAccount}</p>}
-                          {expense.notes && <p>Notes: {expense.notes}</p>}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(expense._id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+  <div key={expense._id} className="border rounded-lg p-4">
+    <div className="flex justify-between items-start">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium">{expense.name}</h3>
+          <Badge className={getTypeColor(expense.type)}>{expense.type}</Badge>
+        </div>
+        <div className="text-sm text-gray-600">
+          <p>Amount: {expense.currency} {expense.amount}</p>
+          <p>Date: {new Date(expense.date).toLocaleDateString()}</p>
+          <p>By: {expense.createdBy?.name || "-"}</p>
+          {expense.withdrawAccount && (
+            <p>
+              Account: {typeof expense.withdrawAccount === "object"
+                ? expense.withdrawAccount.name
+                : expense.withdrawAccount}
+            </p>
+          )}
+          {expense.notes && <p>Notes: {expense.notes}</p>}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm">
+          <Edit className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleDelete(expense._id)}
+          className="text-red-600 hover:text-red-700"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  </div>
                 ))}
               </div>
             )}

@@ -1,7 +1,5 @@
-// components/hourly-work/add-hourly-work-modal.tsx
 "use client"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -13,44 +11,70 @@ interface AddHourlyWorkModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  // for editing (optional)
+  editLog?: HourlyWorkLog | null
 }
 
-export function AddHourlyWorkModal({ projectId, isOpen, onClose, onSuccess }: AddHourlyWorkModalProps) {
-  const [form, setForm] = useState({
-    date: new Date().toISOString().split("T")[0],
-    hours: "",
-    note: "",
-  })
+export interface HourlyWorkLog {
+  _id: string
+  weekStart: string
+  hours: number
+  user: { name: string, email: string, _id: string }
+  billed: boolean
+}
+
+export function AddHourlyWorkModal({
+  projectId,
+  isOpen,
+  onClose,
+  onSuccess,
+  editLog,
+}: AddHourlyWorkModalProps) {
+  const [weekStart, setWeekStart] = useState("")
+  const [hours, setHours] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setForm(f => ({ ...f, [name]: value }))
+  // Pre-fill fields if editing
+  useEffect(() => {
+    if (editLog) {
+      setWeekStart(editLog.weekStart.split("T")[0])
+      setHours(editLog.hours.toString())
+    } else {
+      setWeekStart("") // Or set to current week's Monday
+      setHours("")
+    }
     setError("")
-  }
+  }, [editLog, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
-    if (!form.hours || Number(form.hours) <= 0) {
+    if (!weekStart) {
+      setError("Week start date required")
+      setLoading(false)
+      return
+    }
+    if (!hours || Number(hours) <= 0) {
       setError("Hours must be greater than 0")
       setLoading(false)
       return
     }
     try {
-      await apiClient.createHourlyWork({
-        project: projectId,
-        date: form.date,
-        hours: Number(form.hours),
-        note: form.note,
-      })
-      setForm({ date: new Date().toISOString().split("T")[0], hours: "", note: "" })
+      if (editLog) {
+        await apiClient.updateHourlyWork(editLog._id, { hours: Number(hours) })
+      } else {
+        await apiClient.createHourlyWork({
+          project: projectId,
+          weekStart,
+          hours: Number(hours),
+        })
+      }
       onSuccess()
       onClose()
-    } catch (e: any) {
-      setError("Failed to add hours. Try again.")
+    } catch {
+      setError("Failed to save. Try again.")
     } finally {
       setLoading(false)
     }
@@ -63,7 +87,7 @@ export function AddHourlyWorkModal({ projectId, isOpen, onClose, onSuccess }: Ad
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Add Hours</CardTitle>
+            <CardTitle>{editLog ? "Edit" : "Add"} Weekly Hours</CardTitle>
             <Button variant="ghost" size="sm" onClick={onClose}><X className="h-4 w-4" /></Button>
           </div>
         </CardHeader>
@@ -71,13 +95,14 @@ export function AddHourlyWorkModal({ projectId, isOpen, onClose, onSuccess }: Ad
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <div className="bg-red-100 text-red-700 rounded p-2">{error}</div>}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Date</label>
+              <label className="text-sm font-medium">Week Start *</label>
               <Input
-                name="date"
+                name="weekStart"
                 type="date"
-                value={form.date}
-                onChange={handleChange}
+                value={weekStart}
+                onChange={e => setWeekStart(e.target.value)}
                 required
+                disabled={!!editLog} // Only editable for add, not edit
               />
             </div>
             <div className="space-y-2">
@@ -86,24 +111,15 @@ export function AddHourlyWorkModal({ projectId, isOpen, onClose, onSuccess }: Ad
                 name="hours"
                 type="number"
                 step="0.01"
-                value={form.hours}
-                onChange={handleChange}
+                value={hours}
+                onChange={e => setHours(e.target.value)}
                 required
                 min={0.01}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Note (optional)</label>
-              <Input
-                name="note"
-                value={form.note}
-                onChange={handleChange}
-                placeholder="Task description"
-              />
-            </div>
             <div className="flex gap-4 pt-2">
               <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? "Adding..." : "Add Hours"}
+                {loading ? (editLog ? "Updating..." : "Adding...") : (editLog ? "Update" : "Add")}
               </Button>
               <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
                 Cancel

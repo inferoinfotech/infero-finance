@@ -8,67 +8,56 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { apiClient } from "@/lib/api"
 import Link from "next/link"
-import { ArrowLeft, Edit, Plus, DollarSign, Clock } from "lucide-react"
+import { ArrowLeft, Edit, Plus } from "lucide-react"
 import { PaymentList } from "@/components/payments/payment-list"
 import { AddPaymentModal } from "@/components/payments/add-payment-modal"
+import { AddHourlyWorkModal, HourlyWorkLog } from "@/components/hourly-work/add-hourly-work-modal"
 
-// Updated interfaces
-interface Platform {
-  _id: string
-  name: string
-}
+interface Platform { _id: string; name: string }
 interface Project {
-  _id: string
-  name: string
-  clientName: string
-  platform: Platform | string
-  currency: string
-  status: string
-  startDate?: string
-  endDate?: string
-  priceType: string
-  fixedPrice?: number
-  hourlyRate?: number
-  platformCharge: number
-  conversionRate: number
+  _id: string; name: string; clientName: string; platform: Platform | string
+  currency: string; status: string; startDate?: string; endDate?: string
+  priceType: string; fixedPrice?: number; hourlyRate?: number
+  platformCharge: number; conversionRate: number
 }
 
 interface Payment {
-  _id: string
-  amount: number
-  currency: string
-  amountInINR: number
-  paymentDate: string
-  walletStatus: string
-  bankStatus: string
-  notes: string
+  _id: string; amount: number; currency: string; amountInINR: number
+  paymentDate: string; walletStatus: string; bankStatus: string; notes: string
 }
 
 export default function ProjectDetailPage() {
   const params = useParams()
   const [project, setProject] = useState<Project | null>(null)
   const [payments, setPayments] = useState<Payment[]>([])
+  const [hourlyWork, setHourlyWork] = useState<HourlyWorkLog[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddPayment, setShowAddPayment] = useState(false)
+  const [showAddHours, setShowAddHours] = useState(false)
+  const [editLog, setEditLog] = useState<HourlyWorkLog | null>(null)
 
   useEffect(() => {
-    if (params.id) {
-      fetchProjectDetails()
-    }
+    if (params.id) fetchProjectDetails()
     // eslint-disable-next-line
   }, [params.id])
 
   const fetchProjectDetails = async () => {
+    setLoading(true)
     try {
-      // Most APIs return `{project: {...}}` so adjust accordingly
       const [projectDataRaw, paymentsDataRaw] = await Promise.all([
         apiClient.getProject(params.id as string),
-        apiClient.request(`/api/project-payments/project/${params.id}`)
+        apiClient.getProjectPayments(params.id as string)
       ])
-      // If your API returns {project: {...}} wrap accordingly:
       const projectData = projectDataRaw.project ? projectDataRaw.project : projectDataRaw
       setProject(projectData)
       setPayments(Array.isArray(paymentsDataRaw) ? paymentsDataRaw : (paymentsDataRaw.payments || []))
+      // Only fetch hourly work for hourly projects
+      if (projectData.priceType === "hourly") {
+        const logs = await apiClient.getHourlyWorkEntries(projectData._id)
+        setHourlyWork(Array.isArray(logs) ? logs : [])
+      } else {
+        setHourlyWork([])
+      }
     } catch (error) {
       console.error("Failed to fetch project details:", error)
     } finally {
@@ -76,31 +65,23 @@ export default function ProjectDetailPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800"
-      case "completed":
-        return "bg-blue-100 text-blue-800"
-      case "paused":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const handleDeleteLog = async (logId: string) => {
+    if (!window.confirm("Delete this week log?")) return
+    try {
+      await apiClient.deleteHourlyWork(logId)
+      fetchProjectDetails()
+    } catch (e) {
+      alert("Delete failed!")
     }
   }
 
-  const getPaymentStatusColor = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "received":
-        return "bg-green-100 text-green-800"
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "failed":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+      case "active": return "bg-green-100 text-green-800"
+      case "completed": return "bg-blue-100 text-blue-800"
+      case "paused": return "bg-yellow-100 text-yellow-800"
+      case "cancelled": return "bg-red-100 text-red-800"
+      default: return "bg-gray-100 text-gray-800"
     }
   }
 
@@ -124,12 +105,10 @@ export default function ProjectDetailPage() {
     )
   }
 
-  // Defensive reduce in case payments is not an array
   const totalEarned = Array.isArray(payments)
     ? payments.reduce((sum, payment) => sum + (payment.amountInINR || 0), 0)
     : 0
 
-  // Platform display helper
   const getPlatformName = () =>
     typeof project.platform === "object" && project.platform !== null
       ? project.platform.name
@@ -138,6 +117,7 @@ export default function ProjectDetailPage() {
   return (
     <MainLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center gap-4">
           <Link href="/projects">
             <Button variant="outline" size="sm">
@@ -160,27 +140,19 @@ export default function ProjectDetailPage() {
         {/* Project Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Project Status</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Project Status</CardTitle></CardHeader>
             <CardContent>
               <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
             </CardContent>
           </Card>
-
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Total Earned</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Total Earned</CardTitle></CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">₹{totalEarned.toLocaleString()}</div>
             </CardContent>
           </Card>
-
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Payment Count</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Payment Count</CardTitle></CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{payments.length}</div>
             </CardContent>
@@ -213,8 +185,8 @@ export default function ProjectDetailPage() {
                     {project.priceType === "fixed" && project.fixedPrice !== undefined
                       ? `${project.currency} ${project.fixedPrice}`
                       : project.priceType === "hourly" && project.hourlyRate !== undefined
-                      ? `${project.currency} ${project.hourlyRate}/hr`
-                      : "--"}
+                        ? `${project.currency} ${project.hourlyRate}/hr`
+                        : "--"}
                   </p>
                 </div>
               </div>
@@ -273,6 +245,63 @@ export default function ProjectDetailPage() {
           onClose={() => setShowAddPayment(false)}
           onSuccess={fetchProjectDetails}
         />
+
+        {/* Hourly Work Section */}
+        {project.priceType === "hourly" && (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Weekly Hour Logs</CardTitle>
+                <Button size="sm" onClick={() => { setEditLog(null); setShowAddHours(true) }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Week
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {hourlyWork.length === 0 ? (
+                <div className="text-gray-500 text-center">No week logs yet</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="p-2 border">Week Start</th>
+                        <th className="p-2 border">Hours</th>
+                        <th className="p-2 border">User</th>
+                        <th className="p-2 border">Billed</th>
+                        <th className="p-2 border">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hourlyWork.map(log => (
+                        <tr key={log._id} className="border-b">
+                          <td className="p-2 border">{log.weekStart ? new Date(log.weekStart).toLocaleDateString() : ""}</td>
+                          <td className="p-2 border">{log.hours}</td>
+                          <td className="p-2 border">{log.user?.name || "--"}</td>
+                          <td className="p-2 border">{log.billed ? "Yes" : "No"}</td>
+                          <td className="p-2 border space-x-2">
+                            <Button size="xs" variant="outline"
+                              onClick={() => { setEditLog(log); setShowAddHours(true) }}>Edit</Button>
+                            <Button size="xs" variant="destructive"
+                              onClick={() => handleDeleteLog(log._id)}>Delete</Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <AddHourlyWorkModal
+                projectId={project._id}
+                isOpen={showAddHours}
+                onClose={() => setShowAddHours(false)}
+                onSuccess={fetchProjectDetails}
+                editLog={editLog}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </MainLayout>
   )
