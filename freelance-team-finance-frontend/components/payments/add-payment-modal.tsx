@@ -1,32 +1,28 @@
 "use client"
-
-import type React from "react"
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { apiClient } from "@/lib/api"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
+import { apiClient } from "@/lib/api"
 
 interface Account {
   _id: string
   name: string
   type: "bank" | "wallet"
 }
-
 interface HourlyWork {
   _id: string
-  date: string   // adjust fields as needed
+  weekStart: string // <-- date field for log
   hours: number
-  note?: string
+  billed: boolean
 }
-
 interface Project {
   _id: string
   priceType: "fixed" | "hourly"
-  // add any other fields you need
+  hourlyRate?: number
+  currency: string
 }
-
 interface AddPaymentModalProps {
   projectId: string
   isOpen: boolean
@@ -41,8 +37,8 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
   const [hourlyWorkOptions, setHourlyWorkOptions] = useState<HourlyWork[]>([])
   const [formData, setFormData] = useState({
     amount: "",
-    currency: "USD",
-    amountInINR: "",
+    platformCharge: "",
+    conversionRate: "",
     paymentDate: new Date().toISOString().split("T")[0],
     platformWallet: "",
     walletStatus: "pending",
@@ -61,8 +57,8 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
     if (isOpen && project) {
       setFormData({
         amount: "",
-        currency: "USD",
-        amountInINR: "",
+        platformCharge: "",
+        conversionRate: "",
         paymentDate: new Date().toISOString().split("T")[0],
         platformWallet: "",
         walletStatus: "pending",
@@ -77,57 +73,62 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
     }
   }, [isOpen, project])
 
-  // Fetch accounts and project on modal open
   useEffect(() => {
     if (isOpen) {
       fetchAccounts()
       fetchProject()
     }
   }, [isOpen])
-
-  // Fetch hourly work entries if hourly project
   useEffect(() => {
-    if (project && project.priceType === "hourly") {
-      fetchHourlyWork()
-    }
+    if (project && project.priceType === "hourly") fetchHourlyWork()
   }, [project])
 
   const fetchAccounts = async () => {
     try {
       const data = await apiClient.getAccounts()
-      const accArray = Array.isArray(data) ? data : (Array.isArray(data.accounts) ? data.accounts : [])
-      setAccounts(accArray)
-    } catch (error) {
+      setAccounts(Array.isArray(data) ? data : (Array.isArray(data.accounts) ? data.accounts : []))
+    } catch {
       setAccounts([])
-      console.error("Failed to fetch accounts:", error)
     }
   }
-
   const fetchProject = async () => {
     try {
       const data = await apiClient.getProject(projectId)
-      setProject(data.project ? data.project : data) // support both {project: {...}} or {...}
-    } catch (error) {
+      setProject(data.project ? data.project : data)
+    } catch {
       setProject(null)
-      console.error("Failed to fetch project:", error)
     }
   }
-
   const fetchHourlyWork = async () => {
     try {
       const data = await apiClient.getHourlyWorkEntries(projectId)
       setHourlyWorkOptions(Array.isArray(data) ? data : [])
-    } catch (error) {
+    } catch {
       setHourlyWorkOptions([])
-      console.error("Failed to fetch hourly work entries:", error)
     }
   }
 
+  // Auto-calc for hourly payment
+  useEffect(() => {
+    if (project?.priceType === "hourly") {
+      const hours = Number(formData.hoursBilled)
+      const platformCharge = Number(formData.platformCharge) || 0
+      const rate = Number(project.hourlyRate) || 0
+      if (hours && rate) {
+        setFormData((f) => ({
+          ...f,
+          amount: (hours * rate - platformCharge > 0 ? (hours * rate - platformCharge).toFixed(2) : "0"),
+        }))
+      }
+    }
+    // eslint-disable-next-line
+  }, [formData.hoursBilled, formData.platformCharge, project?.hourlyRate])
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
-    if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = "Amount is required and must be greater than 0"
-    if (!formData.currency) newErrors.currency = "Currency is required"
-    if (!formData.amountInINR || Number(formData.amountInINR) <= 0) newErrors.amountInINR = "Amount in INR is required and must be greater than 0"
+    if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = "Amount is required"
+    if (!formData.platformCharge) newErrors.platformCharge = "Platform charge is required"
+    if (!formData.conversionRate) newErrors.conversionRate = "Conversion rate is required"
     if (!formData.paymentDate) newErrors.paymentDate = "Payment date is required"
     if (!formData.platformWallet) newErrors.platformWallet = "Select wallet account"
     if (!formData.walletStatus) newErrors.walletStatus = "Wallet status is required"
@@ -145,11 +146,17 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
     if (!validateForm()) return
     setLoading(true)
     try {
+      const amount = Number(formData.amount)
+      const platformCharge = Number(formData.platformCharge)
+      const conversionRate = Number(formData.conversionRate)
+      // Compute INR amount
+      const amountInINR = ((amount - platformCharge) * conversionRate).toFixed(2)
       const payload: any = {
         project: projectId,
-        amount: Number(formData.amount),
-        currency: formData.currency,
-        amountInINR: Number(formData.amountInINR),
+        amount,
+        platformCharge,
+        conversionRate,
+        amountInINR: Number(amountInINR),
         paymentDate: formData.paymentDate,
         platformWallet: formData.platformWallet,
         walletStatus: formData.walletStatus,
@@ -166,8 +173,8 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
       await apiClient.createProjectPayment(payload)
       setFormData({
         amount: "",
-        currency: "USD",
-        amountInINR: "",
+        platformCharge: "",
+        conversionRate: "",
         paymentDate: new Date().toISOString().split("T")[0],
         platformWallet: "",
         walletStatus: "pending",
@@ -184,7 +191,6 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
       onClose()
     } catch (error) {
       setErrors({ submit: "Failed to create payment. Please try again." })
-      console.error("Failed to create payment:", error)
     } finally {
       setLoading(false)
     }
@@ -205,8 +211,6 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
   }
 
   if (!isOpen) return null
-
-  // Don’t show form until project is loaded
   if (!project) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -241,7 +245,7 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{errors.submit}</div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* AMOUNT */}
+              {/* AMOUNT (readonly for hourly) */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Amount *</label>
                 <Input
@@ -252,38 +256,37 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
                   onChange={handleChange}
                   placeholder="Enter amount"
                   className={errors.amount ? "border-red-500" : ""}
+                  readOnly={project.priceType === "hourly"}
                 />
                 {errors.amount && <p className="text-sm text-red-600">{errors.amount}</p>}
               </div>
-              {/* CURRENCY */}
+              {/* PLATFORM CHARGE */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Currency *</label>
-                <select
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.currency ? "border-red-500" : "border-gray-300"}`}
-                >
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="INR">INR</option>
-                </select>
-                {errors.currency && <p className="text-sm text-red-600">{errors.currency}</p>}
-              </div>
-              {/* INR AMOUNT */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount in INR *</label>
+                <label className="text-sm font-medium">Platform Charge *</label>
                 <Input
-                  name="amountInINR"
+                  name="platformCharge"
                   type="number"
                   step="0.01"
-                  value={formData.amountInINR}
+                  value={formData.platformCharge}
                   onChange={handleChange}
-                  placeholder="Enter INR amount"
-                  className={errors.amountInINR ? "border-red-500" : ""}
+                  placeholder="e.g., 10"
+                  className={errors.platformCharge ? "border-red-500" : ""}
                 />
-                {errors.amountInINR && <p className="text-sm text-red-600">{errors.amountInINR}</p>}
+                {errors.platformCharge && <p className="text-sm text-red-600">{errors.platformCharge}</p>}
+              </div>
+              {/* CONVERSION RATE */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Conversion Rate *</label>
+                <Input
+                  name="conversionRate"
+                  type="number"
+                  step="0.01"
+                  value={formData.conversionRate}
+                  onChange={handleChange}
+                  placeholder="e.g., 83.5"
+                  className={errors.conversionRate ? "border-red-500" : ""}
+                />
+                {errors.conversionRate && <p className="text-sm text-red-600">{errors.conversionRate}</p>}
               </div>
               {/* PAYMENT DATE */}
               <div className="space-y-2">
@@ -387,18 +390,19 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
                       onChange={handleChange}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.hourlyWorkEntries ? "border-red-500" : "border-gray-300"}`}
                     >
-                      {hourlyWorkOptions.map(entry => (
-                        <option key={entry._id} value={entry._id}>
-                          {entry.date} - {entry.hours} hrs {entry.note ? `(${entry.note})` : ""}
-                        </option>
-                      ))}
+                      {hourlyWorkOptions
+                        .filter(e => !e.billed)
+                        .map(entry => (
+                          <option key={entry._id} value={entry._id}>
+                            {entry.weekStart} - {entry.hours} hrs
+                          </option>
+                        ))}
                     </select>
                     {errors.hourlyWorkEntries && <p className="text-sm text-red-600">{errors.hourlyWorkEntries}</p>}
                   </div>
                 </>
               )}
             </div>
-
             <div className="space-y-2">
               <label className="text-sm font-medium">Notes (Optional)</label>
               <Input
@@ -408,7 +412,6 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
                 placeholder="Additional notes about this payment"
               />
             </div>
-
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={loading} className="flex-1">
                 {loading ? "Adding Payment..." : "Add Payment"}

@@ -5,35 +5,63 @@ const Project = require('../models/Project');
 exports.createPayment = async (req, res, next) => {
   try {
     const {
-      project, amount, currency, amountInINR,
+      project, platformCharge, conversionRate, 
       platformWallet, walletStatus, walletReceivedDate,
       bankAccount, bankStatus, bankTransferDate,
-      hoursBilled, hourlyWorkEntries,
-      paymentDate, notes
+      hourlyWorkEntries, paymentDate, notes
     } = req.body;
 
-    // Validate project exists and belongs to user
     const proj = await Project.findOne({ _id: project, createdBy: req.user.userId });
     if (!proj) return res.status(400).json({ error: 'Project not found or not yours' });
 
-    // For hourly, ensure hours/entries provided if needed
-    if (proj.priceType === 'hourly' && (!hoursBilled || !hourlyWorkEntries || hourlyWorkEntries.length === 0)) {
-      return res.status(400).json({ error: 'Hourly payments must include billed hours and hourly work entries' });
+    if (proj.priceType !== "hourly") {
+      return res.status(400).json({ error: "This route is only for hourly payments." });
     }
 
+    // Fetch unbilled hourly work entries for this project
+    const works = await HourlyWork.find({
+      _id: { $in: hourlyWorkEntries },
+      project,
+      billed: false,
+      user: req.user.userId
+    });
+
+    if (works.length === 0) return res.status(400).json({ error: "No valid hourly work entries selected" });
+
+    // Sum hours
+    const totalHours = works.reduce((acc, w) => acc + w.hours, 0);
+    const hourlyRate = proj.hourlyRate; // always from project
+    const amount = totalHours * hourlyRate;
+    // User input is now only: platformCharge (absolute), conversionRate
+    const receivedAmount = (amount - platformCharge) * conversionRate;
+
+    // Create payment
     const payment = await ProjectPayment.create({
-      project, amount, currency, amountInINR,
+      project,
+      amount,
+      platformCharge,
+      conversionRate,
+      amountInINR: receivedAmount,
+      hoursBilled: totalHours,
+      hourlyWorkEntries: works.map(w => w._id),
       platformWallet, walletStatus, walletReceivedDate,
       bankAccount, bankStatus, bankTransferDate,
-      hoursBilled, hourlyWorkEntries,
       paymentDate, notes
     });
+
+    // Update all the billed logs
+    await HourlyWork.updateMany(
+      { _id: { $in: works.map(w => w._id) } },
+      { $set: { billed: true, payment: payment._id } }
+    );
 
     res.status(201).json({ payment });
   } catch (err) {
     next(err);
   }
 };
+
+
 
 // Get all payments for a project
 exports.getPaymentsForProject = async (req, res, next) => {

@@ -5,10 +5,8 @@ const { addHistory } = require('./historyController'); // adjust path as needed
 exports.createProject = async (req, res, next) => {
   try {
     const {
-      name, clientName, platform, currency,
-      status, startDate, endDate,
-      priceType, hourlyRate, fixedPrice,
-      platformCharge, conversionRate
+      name, clientName, platform, currency, status, startDate, endDate,
+      priceType, hourlyRate, fixedPrice, budget
     } = req.body;
 
     if (priceType === 'hourly' && !hourlyRate) {
@@ -19,29 +17,13 @@ exports.createProject = async (req, res, next) => {
     }
 
     const project = await Project.create({
-      name,
-      clientName,
-      platform,
-      currency,
+      name, clientName, platform, currency,
       status: status || 'pending',
-      startDate,
-      endDate,
-      priceType,
+      startDate, endDate, priceType,
       hourlyRate: priceType === 'hourly' ? hourlyRate : undefined,
       fixedPrice: priceType === 'fixed' ? fixedPrice : undefined,
-      platformCharge,
-      conversionRate,
+      budget,
       createdBy: req.user.userId
-    });
-
-    // LOG TO HISTORY after successful creation
-    await addHistory({
-      user: req.user.userId,
-      action: 'create_project',
-      entityType: 'Project',
-      entityId: project._id,
-      oldValue: null,
-      newValue: project.toObject()
     });
 
     res.status(201).json({ project });

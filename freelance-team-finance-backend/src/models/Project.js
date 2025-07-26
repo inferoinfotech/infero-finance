@@ -7,12 +7,11 @@ const projectSchema = new mongoose.Schema({
   currency:       { type: String, required: true }, // "USD"
   status:         { type: String, enum: ['pending', 'working', 'completed', 'extended', 'paused'], default: 'pending' },
   startDate:      { type: Date, required: true },
-  endDate:        { type: Date }, // Can update/extend this
+  endDate:        { type: Date },
   priceType:      { type: String, enum: ['fixed', 'hourly'], required: true },
-  hourlyRate:     { type: Number }, // required if hourly
-  fixedPrice:     { type: Number }, // required if fixed
-  platformCharge: { type: Number, required: true },
-  conversionRate: { type: Number, required: true },
+  hourlyRate:     { type: Number },
+  fixedPrice:     { type: Number },
+  budget:         { type: Number, required: true }, // Total project budget
   createdBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   createdAt:      { type: Date, default: Date.now }
 });

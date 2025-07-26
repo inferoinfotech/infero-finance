@@ -13,7 +13,7 @@ import Link from "next/link"
 export default function CreateProjectPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [platforms, setPlatforms] = useState([]) // <-- NEW
+  const [platforms, setPlatforms] = useState<any[]>([])
   const [formData, setFormData] = useState({
     name: "",
     clientName: "",
@@ -25,12 +25,10 @@ export default function CreateProjectPage() {
     priceType: "fixed",
     fixedPrice: "",
     hourlyRate: "",
-    platformCharge: "",
-    conversionRate: "1",
+    budget: "", // <-- Correct field
   })
 
   useEffect(() => {
-    // Fetch platform list
     async function fetchPlatforms() {
       try {
         const data = await apiClient.getPlatforms()
@@ -51,16 +49,13 @@ export default function CreateProjectPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-
     try {
       const projectData = {
         ...formData,
         fixedPrice: formData.priceType === "fixed" ? Number(formData.fixedPrice) : undefined,
         hourlyRate: formData.priceType === "hourly" ? Number(formData.hourlyRate) : undefined,
-        platformCharge: Number(formData.platformCharge),
-        conversionRate: Number(formData.conversionRate),
+        budget: formData.budget ? Number(formData.budget) : undefined
       }
-
       await apiClient.createProject(projectData)
       router.push("/projects")
     } catch (error) {
@@ -226,32 +221,18 @@ export default function CreateProjectPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Platform Charge (%) *</label>
-                  <Input
-                    name="platformCharge"
-                    type="number"
-                    step="0.01"
-                    value={formData.platformCharge}
-                    onChange={handleChange}
-                    required
-                    placeholder="e.g., 10"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Conversion Rate *</label>
-                  <Input
-                    name="conversionRate"
-                    type="number"
-                    step="0.01"
-                    value={formData.conversionRate}
-                    onChange={handleChange}
-                    required
-                    placeholder="e.g., 83.5"
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Total Budget *</label>
+                <Input
+                  name="budget"
+                  type="number"
+                  step="0.01"
+                  value={formData.budget}
+                  onChange={handleChange}
+                  required
+                  placeholder="e.g., 10000"
+                />
+                <span className="text-xs text-gray-500">Total amount in selected currency</span>
               </div>
 
               <div className="flex gap-4 pt-4">
