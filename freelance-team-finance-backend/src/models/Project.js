@@ -11,7 +11,7 @@ const projectSchema = new mongoose.Schema({
   priceType:      { type: String, enum: ['fixed', 'hourly'], required: true },
   hourlyRate:     { type: Number },
   fixedPrice:     { type: Number },
-  budget:         { type: Number, required: true }, // Total project budget
+  budget:         { type: Number }, // Total project budget
   createdBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   createdAt:      { type: Date, default: Date.now }
 });

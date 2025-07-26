@@ -1,60 +1,62 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { apiClient } from "@/lib/api"
-import { X } from "lucide-react"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { apiClient } from "@/lib/api";
+import { X } from "lucide-react";
 
 interface Account {
-  _id: string
-  name: string
-  type: "bank" | "wallet"
+  _id: string;
+  name: string;
+  type: "bank" | "wallet";
 }
 
 interface HourlyWork {
-  _id: string
-  weekStart?: string // for weekly log
-  hours: number
-  user?: { name?: string }
-  note?: string
+  _id: string;
+  weekStart?: string;
+  hours: number;
+  user?: { name?: string };
+  note?: string;
+  billed?: boolean;
+  payment?: string; // Added for logic
 }
 
 interface Project {
-  _id: string
-  priceType: "fixed" | "hourly"
+  _id: string;
+  priceType: "fixed" | "hourly";
+  hourlyRate?: number;
 }
 
 interface Payment {
-  _id: string
-  amount: number
-  currency: string
-  amountInINR: number
-  paymentDate: string
-  platformWallet: string | Account
-  walletStatus: string
-  bankAccount?: string | Account
-  bankStatus: string
-  notes?: string
-  // Only on hourly payments:
-  hoursBilled?: number
-  hourlyWorkEntries?: string[] // or populated
+  _id: string;
+  amount: number;
+  currency: string;
+  amountInINR: number;
+  paymentDate: string;
+  platformWallet: string | Account;
+  walletStatus: string;
+  bankAccount?: string | Account;
+  bankStatus: string;
+  notes?: string;
+  project: string;
+  hoursBilled?: number;
+  hourlyWorkEntries?: string[] | HourlyWork[];
 }
 
 interface EditPaymentModalProps {
-  payment: Payment | null
-  isOpen: boolean
-  onClose: () => void
-  onSuccess: () => void
+  payment: Payment | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
 }
 
 export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPaymentModalProps) {
-  const [loading, setLoading] = useState(false)
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [project, setProject] = useState<Project | null>(null)
-  const [hourlyWorkOptions, setHourlyWorkOptions] = useState<HourlyWork[]>([])
+  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
+  const [hourlyWorkOptions, setHourlyWorkOptions] = useState<HourlyWork[]>([]);
   const [formData, setFormData] = useState({
     amount: "",
     currency: "USD",
@@ -67,15 +69,16 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
     notes: "",
     hoursBilled: "",
     hourlyWorkEntries: [] as string[],
-  })
-  const [errors, setErrors] = useState<Record<string, string>>({})
+    conversionRate: "",
+    platformCharge: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Load payment/project/accounts when modal opens
   useEffect(() => {
     if (isOpen && payment) {
-      fetchAccounts()
-      fetchProject(payment)
-      // Prefill form data
+      fetchAccounts();
+      fetchProject(payment);
       setFormData({
         amount: payment.amount?.toString() || "",
         currency: payment.currency || "USD",
@@ -94,121 +97,163 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
         hourlyWorkEntries: (payment.hourlyWorkEntries && Array.isArray(payment.hourlyWorkEntries))
           ? payment.hourlyWorkEntries.map((e: any) => (typeof e === "string" ? e : e._id))
           : [],
-      })
+        conversionRate: payment.conversionRate?.toString?.() || "",
+        platformCharge: payment.platformCharge?.toString?.() || "",
+      });
     }
     // eslint-disable-next-line
-  }, [isOpen, payment])
+  }, [isOpen, payment]);
 
-  // Fetch available hourly logs for the project (if hourly)
   useEffect(() => {
     if (project && project.priceType === "hourly" && payment) {
-      fetchHourlyWork(payment)
+      fetchHourlyWork(payment);
     }
     // eslint-disable-next-line
-  }, [project, payment])
+  }, [project, payment]);
 
   const fetchAccounts = async () => {
     try {
-      const data = await apiClient.getAccounts()
-      const accArray = Array.isArray(data) ? data : (Array.isArray(data.accounts) ? data.accounts : [])
-      setAccounts(accArray)
+      const data = await apiClient.getAccounts();
+      const accArray = Array.isArray(data) ? data : (Array.isArray(data.accounts) ? data.accounts : []);
+      setAccounts(accArray);
     } catch (error) {
-      setAccounts([])
-      console.error("Failed to fetch accounts:", error)
+      setAccounts([]);
     }
-  }
+  };
 
   const fetchProject = async (payment: Payment) => {
     try {
-      // We assume payment object has a project id, either in payment.project or passed from parent
-      // If you don't have it, pass it in EditPaymentModalProps
-      // @ts-ignore
-      const paymentProjectId = payment.project || payment._id?.split("-")[0] // fallback
-      const proj = await apiClient.getProject(paymentProjectId)
-      setProject(proj.project ? proj.project : proj)
+      const paymentProjectId = (payment.project || (payment as any)._id?.split("-")[0]);
+      const proj = await apiClient.getProject(paymentProjectId);
+      setProject(proj.project ? proj.project : proj);
     } catch (error) {
-      setProject(null)
+      setProject(null);
     }
-  }
+  };
 
+  // For hourly: get all unbilled OR already billed to this payment
   const fetchHourlyWork = async (payment: Payment) => {
     try {
-      // @ts-ignore
-      const paymentProjectId = payment.project || payment._id?.split("-")[0]
-      const logs = await apiClient.getHourlyWorkEntries(paymentProjectId)
-      setHourlyWorkOptions(Array.isArray(logs) ? logs : [])
+      const paymentProjectId = (payment.project || (payment as any)._id?.split("-")[0]);
+      let logs = await apiClient.getHourlyWorkEntries(paymentProjectId);
+      logs = Array.isArray(logs) ? logs : [];
+      // Always show unbilled + logs already billed by this payment (for editing)
+      const currentIds = new Set(
+        (payment.hourlyWorkEntries || []).map((e: any) => (typeof e === "string" ? e : e._id))
+      );
+      const selectableLogs = logs.filter(
+        (log: HourlyWork) => !log.billed || (log.payment && currentIds.has(log._id))
+      );
+      setHourlyWorkOptions(selectableLogs);
     } catch (error) {
-      setHourlyWorkOptions([])
+      setHourlyWorkOptions([]);
     }
-  }
+  };
+
+  // Auto-calc for hourly payment
+  useEffect(() => {
+    if (project?.priceType === "hourly") {
+      // Get selected HourlyWork objects
+      const selectedLogs = hourlyWorkOptions.filter(work =>
+        formData.hourlyWorkEntries.includes(work._id)
+      );
+      const hours = selectedLogs.reduce((acc, w) => acc + w.hours, 0);
+      const rate = Number(project.hourlyRate) || 0;
+      setFormData(f => ({
+        ...f,
+        hoursBilled: hours > 0 ? hours.toString() : "",
+        amount: hours > 0 ? (hours * rate).toFixed(2) : "",
+      }));
+    }
+    // eslint-disable-next-line
+  }, [formData.hourlyWorkEntries, project?.hourlyRate, hourlyWorkOptions]);
+
+  // Amount in INR: always calculated (never editable)
+  const amount = Number(formData.amount) || 0;
+  const platformCharge = Number(formData.platformCharge) || 0;
+  const conversionRate = Number(formData.conversionRate) || 0;
+  const amountInINR =
+    amount - platformCharge > 0 && conversionRate > 0
+      ? ((amount - platformCharge) * conversionRate).toFixed(2)
+      : "0.00";
+
+  // Auto-update amountInINR on field changes
+  useEffect(() => {
+    setFormData(f => ({
+      ...f,
+      amountInINR,
+    }));
+    // eslint-disable-next-line
+  }, [formData.amount, formData.platformCharge, formData.conversionRate]);
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {}
-    if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = "Amount is required and must be greater than 0"
-    if (!formData.currency) newErrors.currency = "Currency is required"
-    if (!formData.amountInINR || Number(formData.amountInINR) <= 0) newErrors.amountInINR = "Amount in INR is required and must be greater than 0"
-    if (!formData.paymentDate) newErrors.paymentDate = "Payment date is required"
-    if (!formData.platformWallet) newErrors.platformWallet = "Select wallet account"
-    if (!formData.walletStatus) newErrors.walletStatus = "Wallet status is required"
-    if (!formData.bankStatus) newErrors.bankStatus = "Bank status is required"
+    const newErrors: Record<string, string> = {};
+    if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = "Amount is required and must be greater than 0";
+    if (!formData.amountInINR || Number(formData.amountInINR) <= 0) newErrors.amountInINR = "Amount in INR is required and must be greater than 0";
+    if (!formData.paymentDate) newErrors.paymentDate = "Payment date is required";
+    if (!formData.platformWallet) newErrors.platformWallet = "Select wallet account";
+    if (!formData.walletStatus) newErrors.walletStatus = "Wallet status is required";
+    if (!formData.bankStatus) newErrors.bankStatus = "Bank status is required";
+    if (!formData.conversionRate) newErrors.conversionRate = "Conversion rate is required";
+    if (!formData.platformCharge) newErrors.platformCharge = "Platform charge is required";
     // Hourly specific
     if (project && project.priceType === "hourly") {
-      if (!formData.hoursBilled || Number(formData.hoursBilled) <= 0) newErrors.hoursBilled = "Hours billed is required"
-      if (!formData.hourlyWorkEntries.length) newErrors.hourlyWorkEntries = "Select at least one hourly work entry"
+      if (!formData.hoursBilled || Number(formData.hoursBilled) <= 0) newErrors.hoursBilled = "Hours billed is required";
+      if (!formData.hourlyWorkEntries.length) newErrors.hourlyWorkEntries = "Select at least one hourly work entry";
     }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!validateForm() || !payment) return
-    setLoading(true)
+    e.preventDefault();
+    if (!validateForm() || !payment) return;
+    setLoading(true);
     try {
       const updateData: any = {
         amount: Number(formData.amount),
-        currency: formData.currency,
         amountInINR: Number(formData.amountInINR),
         paymentDate: formData.paymentDate,
         platformWallet: formData.platformWallet,
         walletStatus: formData.walletStatus,
         bankStatus: formData.bankStatus,
         notes: formData.notes,
-      }
-      if (formData.bankAccount) updateData.bankAccount = formData.bankAccount
+        conversionRate: Number(formData.conversionRate),
+        platformCharge: Number(formData.platformCharge),
+      };
+      if (formData.currency) updateData.currency = formData.currency;
+      if (formData.bankAccount) updateData.bankAccount = formData.bankAccount;
       // Hourly fields
       if (project && project.priceType === "hourly") {
-        updateData.hoursBilled = Number(formData.hoursBilled)
-        updateData.hourlyWorkEntries = formData.hourlyWorkEntries
+        updateData.hoursBilled = Number(formData.hoursBilled);
+        updateData.hourlyWorkEntries = formData.hourlyWorkEntries;
       }
-      await apiClient.updateProjectPayment(payment._id, updateData)
-      setErrors({})
-      onSuccess()
-      onClose()
+      await apiClient.updateProjectPayment(payment._id, updateData);
+      setErrors({});
+      onSuccess();
+      onClose();
     } catch (error) {
-      setErrors({ submit: "Failed to update payment. Please try again." })
-      console.error("Failed to update payment:", error)
+      setErrors({ submit: "Failed to update payment. Please try again." });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type, multiple, options } = e.target
+    const { name, value, type, options } = e.target;
     if (type === "select-multiple") {
-      const selected: string[] = []
+      const selected: string[] = [];
       for (let i = 0; i < options.length; i++) {
-        if ((options[i] as any).selected) selected.push(options[i].value)
+        if ((options[i] as any).selected) selected.push(options[i].value);
       }
-      setFormData((f) => ({ ...f, [name]: selected }))
+      setFormData(f => ({ ...f, [name]: selected }));
     } else {
-      setFormData((f) => ({ ...f, [name]: value }))
+      setFormData(f => ({ ...f, [name]: value }));
     }
-    if (errors[name]) setErrors({ ...errors, [name]: "" })
-  }
+    if (errors[name]) setErrors({ ...errors, [name]: "" });
+  };
 
-  if (!isOpen || !payment) return null
-  // Don't show form until project is loaded
+  if (!isOpen || !payment) return null;
   if (!project) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -223,7 +268,7 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -243,7 +288,7 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{errors.submit}</div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* AMOUNT */}
+              {/* AMOUNT (readonly for hourly) */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Amount *</label>
                 <Input
@@ -254,6 +299,7 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                   onChange={handleChange}
                   placeholder="Enter amount"
                   className={errors.amount ? "border-red-500" : ""}
+                  readOnly={project.priceType === "hourly"}
                 />
                 {errors.amount && <p className="text-sm text-red-600">{errors.amount}</p>}
               </div>
@@ -273,6 +319,34 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                 </select>
                 {errors.currency && <p className="text-sm text-red-600">{errors.currency}</p>}
               </div>
+              {/* PLATFORM CHARGE */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Platform Charge *</label>
+                <Input
+                  name="platformCharge"
+                  type="number"
+                  step="0.01"
+                  value={formData.platformCharge}
+                  onChange={handleChange}
+                  placeholder="e.g., 10"
+                  className={errors.platformCharge ? "border-red-500" : ""}
+                />
+                {errors.platformCharge && <p className="text-sm text-red-600">{errors.platformCharge}</p>}
+              </div>
+              {/* CONVERSION RATE */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Conversion Rate *</label>
+                <Input
+                  name="conversionRate"
+                  type="number"
+                  step="0.01"
+                  value={formData.conversionRate}
+                  onChange={handleChange}
+                  placeholder="e.g., 83.5"
+                  className={errors.conversionRate ? "border-red-500" : ""}
+                />
+                {errors.conversionRate && <p className="text-sm text-red-600">{errors.conversionRate}</p>}
+              </div>
               {/* INR AMOUNT */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Amount in INR *</label>
@@ -281,9 +355,8 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                   type="number"
                   step="0.01"
                   value={formData.amountInINR}
-                  onChange={handleChange}
-                  placeholder="Enter INR amount"
-                  className={errors.amountInINR ? "border-red-500" : ""}
+                  readOnly
+                  className="bg-gray-100 cursor-not-allowed"
                 />
                 {errors.amountInINR && <p className="text-sm text-red-600">{errors.amountInINR}</p>}
               </div>
@@ -374,9 +447,8 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                       type="number"
                       step="0.1"
                       value={formData.hoursBilled}
-                      onChange={handleChange}
-                      placeholder="Total hours for this payment"
-                      className={errors.hoursBilled ? "border-red-500" : ""}
+                      readOnly
+                      className={errors.hoursBilled ? "border-red-500 bg-gray-100 cursor-not-allowed" : "bg-gray-100 cursor-not-allowed"}
                     />
                     {errors.hoursBilled && <p className="text-sm text-red-600">{errors.hoursBilled}</p>}
                   </div>
@@ -403,7 +475,6 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                 </>
               )}
             </div>
-
             <div className="space-y-2">
               <label className="text-sm font-medium">Notes (Optional)</label>
               <Input
@@ -413,7 +484,6 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                 placeholder="Additional notes about this payment"
               />
             </div>
-
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={loading} className="flex-1">
                 {loading ? "Updating Payment..." : "Update Payment"}
@@ -426,5 +496,5 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

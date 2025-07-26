@@ -23,23 +23,16 @@ export default function CreateProjectPage() {
     startDate: "",
     endDate: "",
     priceType: "fixed",
-    fixedPrice: "",
     hourlyRate: "",
-    budget: "", // <-- Correct field
+    budget: "", // For fixed price only!
   })
 
   useEffect(() => {
     async function fetchPlatforms() {
       try {
         const data = await apiClient.getPlatforms()
-        if (Array.isArray(data)) {
-          setPlatforms(data)
-        } else if (data && Array.isArray(data.platforms)) {
-          setPlatforms(data.platforms)
-        } else {
-          setPlatforms([])
-        }
-      } catch (error) {
+        setPlatforms(Array.isArray(data) ? data : (data.platforms || []))
+      } catch {
         setPlatforms([])
       }
     }
@@ -50,13 +43,25 @@ export default function CreateProjectPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      const projectData = {
+      const payload: any = {
         ...formData,
-        fixedPrice: formData.priceType === "fixed" ? Number(formData.fixedPrice) : undefined,
-        hourlyRate: formData.priceType === "hourly" ? Number(formData.hourlyRate) : undefined,
-        budget: formData.budget ? Number(formData.budget) : undefined
+        platform: formData.platform,
+        currency: formData.currency,
+        status: formData.status,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        priceType: formData.priceType,
       }
-      await apiClient.createProject(projectData)
+      if (formData.priceType === "fixed") {
+        payload.budget = Number(formData.budget)
+        payload.fixedPrice = Number(0)
+        payload.hourlyRate = undefined
+      } else {
+        payload.hourlyRate = Number(formData.hourlyRate)
+        payload.budget = undefined
+        payload.fixedPrice = undefined
+      }
+      await apiClient.createProject(payload)
       router.push("/projects")
     } catch (error) {
       console.error("Failed to create project:", error)
@@ -87,7 +92,6 @@ export default function CreateProjectPage() {
             <p className="text-gray-600">Add a new project to your portfolio</p>
           </div>
         </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Project Details</CardTitle>
@@ -95,6 +99,7 @@ export default function CreateProjectPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Name, Client Name, Platform, Currency, Status, Start, End */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Project Name *</label>
                   <Input
@@ -105,7 +110,6 @@ export default function CreateProjectPage() {
                     placeholder="Enter project name"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Client Name *</label>
                   <Input
@@ -116,7 +120,6 @@ export default function CreateProjectPage() {
                     placeholder="Enter client name"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Platform *</label>
                   <select
@@ -134,7 +137,6 @@ export default function CreateProjectPage() {
                     ))}
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Currency *</label>
                   <select
@@ -150,7 +152,6 @@ export default function CreateProjectPage() {
                     <option value="INR">INR</option>
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Status *</label>
                   <select
@@ -167,7 +168,6 @@ export default function CreateProjectPage() {
                     <option value="paused">Paused</option>
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Price Type *</label>
                   <select
@@ -181,32 +181,32 @@ export default function CreateProjectPage() {
                     <option value="hourly">Hourly Rate</option>
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Start Date *</label>
                   <Input name="startDate" type="date" value={formData.startDate} onChange={handleChange} required />
                 </div>
-
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">End Date *</label>
-                  <Input name="endDate" type="date" value={formData.endDate} onChange={handleChange} required />
+                  <label className="text-sm font-medium">End Date </label>
+                  <Input name="endDate" type="date" value={formData.endDate} onChange={handleChange} />
                 </div>
               </div>
-
-              {formData.priceType === "fixed" ? (
+              {/* Show fields based on project type */}
+              {formData.priceType === "fixed" && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Fixed Price *</label>
+                  <label className="text-sm font-medium">Total Budget *</label>
                   <Input
-                    name="fixedPrice"
+                    name="budget"
                     type="number"
                     step="0.01"
-                    value={formData.fixedPrice}
+                    value={formData.budget}
                     onChange={handleChange}
                     required
-                    placeholder="Enter fixed price"
+                    placeholder="e.g., 10000"
                   />
+                  <span className="text-xs text-gray-500">Total amount in selected currency</span>
                 </div>
-              ) : (
+              )}
+              {formData.priceType === "hourly" && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Hourly Rate *</label>
                   <Input
@@ -220,21 +220,6 @@ export default function CreateProjectPage() {
                   />
                 </div>
               )}
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Total Budget *</label>
-                <Input
-                  name="budget"
-                  type="number"
-                  step="0.01"
-                  value={formData.budget}
-                  onChange={handleChange}
-                  required
-                  placeholder="e.g., 10000"
-                />
-                <span className="text-xs text-gray-500">Total amount in selected currency</span>
-              </div>
-
               <div className="flex gap-4 pt-4">
                 <Button type="submit" disabled={loading} className="flex-1">
                   {loading ? "Creating..." : "Create Project"}

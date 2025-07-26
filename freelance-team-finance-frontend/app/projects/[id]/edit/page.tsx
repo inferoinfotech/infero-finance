@@ -31,13 +31,10 @@ export default function EditProjectPage() {
     startDate: "",
     endDate: "",
     priceType: "fixed",
-    fixedPrice: "",
-    hourlyRate: "",
-    platformCharge: "",
-    conversionRate: "1",
+    budget: "",      // Only for fixed price
+    hourlyRate: "",  // Only for hourly
   })
 
-  // Fetch platforms for dropdown
   useEffect(() => {
     apiClient.getPlatforms().then((data) => {
       if (Array.isArray(data)) setPlatforms(data)
@@ -55,10 +52,8 @@ export default function EditProjectPage() {
   const fetchProject = async () => {
     try {
       let project = await apiClient.getProject(params.id as string)
-      // Some APIs return {project: {...}}
       if (project.project) project = project.project
 
-      // Handle platform as object or string, always use its id
       let platformId = ""
       if (typeof project.platform === "object" && project.platform !== null) {
         platformId = project.platform._id
@@ -75,10 +70,8 @@ export default function EditProjectPage() {
         startDate: project.startDate ? project.startDate.split("T")[0] : "",
         endDate: project.endDate ? project.endDate.split("T")[0] : "",
         priceType: project.priceType || "fixed",
-        fixedPrice: project.fixedPrice?.toString() || "",
+        budget: project.budget?.toString() || "",
         hourlyRate: project.hourlyRate?.toString() || "",
-        platformCharge: project.platformCharge?.toString() || "",
-        conversionRate: project.conversionRate?.toString() || "1",
       })
     } catch (error) {
       console.error("Failed to fetch project:", error)
@@ -92,16 +85,26 @@ export default function EditProjectPage() {
     setLoading(true)
 
     try {
-      const projectData = {
-        ...formData,
-        platform: formData.platform, // Should be the platform ID
-        fixedPrice: formData.priceType === "fixed" ? Number(formData.fixedPrice) : undefined,
-        hourlyRate: formData.priceType === "hourly" ? Number(formData.hourlyRate) : undefined,
-        platformCharge: Number(formData.platformCharge),
-        conversionRate: Number(formData.conversionRate),
+      const payload: any = {
+        name: formData.name,
+        clientName: formData.clientName,
+        platform: formData.platform,
+        currency: formData.currency,
+        status: formData.status,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        priceType: formData.priceType,
       }
-
-      await apiClient.updateProject(params.id as string, projectData)
+      if (formData.priceType === "fixed") {
+        payload.budget = Number(formData.budget)
+        payload.fixedPrice = Number(formData.budget) // Backend expects both
+        payload.hourlyRate = undefined
+      } else {
+        payload.hourlyRate = Number(formData.hourlyRate)
+        payload.budget = undefined
+        payload.fixedPrice = undefined
+      }
+      await apiClient.updateProject(params.id as string, payload)
       router.push(`/projects/${params.id}`)
     } catch (error) {
       console.error("Failed to update project:", error)
@@ -142,7 +145,6 @@ export default function EditProjectPage() {
             <p className="text-gray-600">Update project details</p>
           </div>
         </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Project Details</CardTitle>
@@ -160,7 +162,6 @@ export default function EditProjectPage() {
                     placeholder="Enter project name"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Client Name *</label>
                   <Input
@@ -171,7 +172,6 @@ export default function EditProjectPage() {
                     placeholder="Enter client name"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Platform *</label>
                   <select
@@ -181,7 +181,7 @@ export default function EditProjectPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
-                    <option value="">Select a platform</option>
+                    <option value="">Select Platform</option>
                     {platforms.map((p) => (
                       <option key={p._id} value={p._id}>
                         {p.name}
@@ -189,7 +189,6 @@ export default function EditProjectPage() {
                     ))}
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Currency *</label>
                   <select
@@ -205,7 +204,6 @@ export default function EditProjectPage() {
                     <option value="INR">INR</option>
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Status *</label>
                   <select
@@ -222,7 +220,6 @@ export default function EditProjectPage() {
                     <option value="paused">Paused</option>
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Price Type *</label>
                   <select
@@ -236,32 +233,32 @@ export default function EditProjectPage() {
                     <option value="hourly">Hourly Rate</option>
                   </select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Start Date *</label>
                   <Input name="startDate" type="date" value={formData.startDate} onChange={handleChange} required />
                 </div>
-
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">End Date *</label>
-                  <Input name="endDate" type="date" value={formData.endDate} onChange={handleChange} required />
+                  <label className="text-sm font-medium">End Date </label>
+                  <Input name="endDate" type="date" value={formData.endDate} onChange={handleChange}  />
                 </div>
               </div>
-
-              {formData.priceType === "fixed" ? (
+              {/* Show fields based on project type */}
+              {formData.priceType === "fixed" && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Fixed Price *</label>
+                  <label className="text-sm font-medium">Total Budget *</label>
                   <Input
-                    name="fixedPrice"
+                    name="budget"
                     type="number"
                     step="0.01"
-                    value={formData.fixedPrice}
+                    value={formData.budget}
                     onChange={handleChange}
                     required
-                    placeholder="Enter fixed price"
+                    placeholder="e.g., 10000"
                   />
+                  <span className="text-xs text-gray-500">Total amount in selected currency</span>
                 </div>
-              ) : (
+              )}
+              {formData.priceType === "hourly" && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Hourly Rate *</label>
                   <Input
@@ -275,35 +272,6 @@ export default function EditProjectPage() {
                   />
                 </div>
               )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Platform Charge (%) *</label>
-                  <Input
-                    name="platformCharge"
-                    type="number"
-                    step="0.01"
-                    value={formData.platformCharge}
-                    onChange={handleChange}
-                    required
-                    placeholder="e.g., 10"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Conversion Rate *</label>
-                  <Input
-                    name="conversionRate"
-                    type="number"
-                    step="0.01"
-                    value={formData.conversionRate}
-                    onChange={handleChange}
-                    required
-                    placeholder="e.g., 83.5"
-                  />
-                </div>
-              </div>
-
               <div className="flex gap-4 pt-4">
                 <Button type="submit" disabled={loading} className="flex-1">
                   {loading ? "Updating..." : "Update Project"}
