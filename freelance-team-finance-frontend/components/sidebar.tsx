@@ -22,8 +22,12 @@ export function Sidebar() {
 
   return (
     <div className="flex flex-col w-64 bg-gray-900 text-white min-h-screen">
-      <div className="flex items-center justify-center h-16 bg-gray-800">
-        <h1 className="text-xl font-bold">FreelanceTeam</h1>
+      <div className="flex items-center justify-center h-16 ">
+        <img
+          src="/infero.png"
+          alt="FreelanceTeam Logo"
+          className="h-14 "
+        />
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-2">
@@ -33,9 +37,8 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                isActive ? "bg-gray-700 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"
-              }`}
+              className={`flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${isActive ? "bg-gray-700 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                }`}
             >
               <item.icon className="mr-3 h-5 w-5" />
               {item.name}
