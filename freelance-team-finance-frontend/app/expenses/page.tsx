@@ -16,7 +16,6 @@ interface Expense {
   type: string
   name: string
   amount: number
-  currency: string
   date: string
   withdrawAccount?: string
   notes: string
@@ -37,7 +36,6 @@ export default function ExpensesPage() {
     type: "general",
     name: "",
     amount: "",
-    currency: "INR",
     date: new Date().toISOString().split("T")[0],
     withdrawAccount: "",
     notes: "",
@@ -84,7 +82,6 @@ const fetchExpenses = async () => {
         type: "general",
         name: "",
         amount: "",
-        currency: "INR",
         date: new Date().toISOString().split("T")[0],
         withdrawAccount: "",
         notes: "",
@@ -260,21 +257,6 @@ const fetchExpenses = async () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Currency *</label>
-                    <select
-                      value={formData.currency}
-                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="INR">INR</option>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
                     <label className="text-sm font-medium">Date *</label>
                     <Input
                       type="date"
@@ -353,7 +335,7 @@ const fetchExpenses = async () => {
           <Badge className={getTypeColor(expense.type)}>{expense.type}</Badge>
         </div>
         <div className="text-sm text-gray-600">
-          <p>Amount: {expense.currency} {expense.amount}</p>
+          <p>Amount: {expense.amount}</p>
           <p>Date: {new Date(expense.date).toLocaleDateString()}</p>
           <p>By: {expense.createdBy?.name || "-"}</p>
           {expense.withdrawAccount && (
