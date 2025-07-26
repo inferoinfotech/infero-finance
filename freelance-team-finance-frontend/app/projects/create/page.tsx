@@ -54,7 +54,7 @@ export default function CreateProjectPage() {
       }
       if (formData.priceType === "fixed") {
         payload.budget = Number(formData.budget)
-        payload.fixedPrice = Number(0)
+        payload.fixedPrice = Number(formData.budget)
         payload.hourlyRate = undefined
       } else {
         payload.hourlyRate = Number(formData.hourlyRate)

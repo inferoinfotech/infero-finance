@@ -41,7 +41,7 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
     conversionRate: "",
     paymentDate: new Date().toISOString().split("T")[0],
     platformWallet: "",
-    walletStatus: "pending",
+    walletStatus: "on_hold",
     walletReceivedDate: "",
     bankAccount: "",
     bankStatus: "pending",
@@ -61,7 +61,7 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
         conversionRate: "",
         paymentDate: new Date().toISOString().split("T")[0],
         platformWallet: "",
-        walletStatus: "pending",
+        walletStatus: "on_hold",
         walletReceivedDate: "",
         bankAccount: "",
         bankStatus: "pending",
@@ -128,6 +128,17 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
     // eslint-disable-next-line
   }, [formData.hourlyWorkEntries, project?.hourlyRate, hourlyWorkOptions]);
 
+  // Wallet/Bank status sync
+  useEffect(() => {
+    // When wallet status changes, enforce bank status
+    if (formData.walletStatus === "on_hold") {
+      setFormData(f => ({ ...f, bankStatus: "pending" }));
+    } else if (formData.walletStatus === "released") {
+      setFormData(f => ({ ...f, bankStatus: "received" }));
+    }
+    // eslint-disable-next-line
+  }, [formData.walletStatus]);
+
   // Amount in INR: always calculated (never editable)
   const amount = Number(formData.amount) || 0;
   const platformCharge = Number(formData.platformCharge) || 0;
@@ -185,7 +196,7 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
         conversionRate: "",
         paymentDate: new Date().toISOString().split("T")[0],
         platformWallet: "",
-        walletStatus: "pending",
+        walletStatus: "on_hold",
         walletReceivedDate: "",
         bankAccount: "",
         bankStatus: "pending",
@@ -348,7 +359,6 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.walletStatus ? "border-red-500" : "border-gray-300"}`}
                 >
-                  <option value="pending">Pending</option>
                   <option value="on_hold">On Hold</option>
                   <option value="released">Released</option>
                 </select>
@@ -379,9 +389,10 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
                   value={formData.bankStatus}
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.bankStatus ? "border-red-500" : "border-gray-300"}`}
+                  disabled={formData.walletStatus === "on_hold"}
                 >
                   <option value="pending">Pending</option>
-                  <option value="released">Released</option>
+                  <option value="received">Received</option>
                 </select>
                 {errors.bankStatus && <p className="text-sm text-red-600">{errors.bankStatus}</p>}
               </div>

@@ -8,11 +8,11 @@ const projectPaymentSchema = new mongoose.Schema({
   amountInINR:       { type: Number, required: true },      // Calculated: (amount - platformCharge) * conversionRate
   // Wallet Step
   platformWallet:    { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
-  walletStatus:      { type: String, enum: ['pending', 'on_hold', 'released'], default: 'pending' },
+  walletStatus:      { type: String, enum: [ 'on_hold', 'released'], default: 'on_hold' },
   walletReceivedDate:{ type: Date },
   // Bank Step
   bankAccount:       { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
-  bankStatus:        { type: String, enum: ['pending', 'released'], default: 'pending' },
+  bankStatus:        { type: String, enum: ['pending', 'received'], default: 'pending' },
   bankTransferDate:  { type: Date },
   // For hourly projects
   hoursBilled:       { type: Number },

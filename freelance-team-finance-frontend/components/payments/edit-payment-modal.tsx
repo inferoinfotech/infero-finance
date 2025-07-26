@@ -12,7 +12,6 @@ interface Account {
   name: string;
   type: "bank" | "wallet";
 }
-
 interface HourlyWork {
   _id: string;
   weekStart?: string;
@@ -20,15 +19,13 @@ interface HourlyWork {
   user?: { name?: string };
   note?: string;
   billed?: boolean;
-  payment?: string; // Added for logic
+  payment?: string;
 }
-
 interface Project {
   _id: string;
   priceType: "fixed" | "hourly";
   hourlyRate?: number;
 }
-
 interface Payment {
   _id: string;
   amount: number;
@@ -43,8 +40,9 @@ interface Payment {
   project: string;
   hoursBilled?: number;
   hourlyWorkEntries?: string[] | HourlyWork[];
+  conversionRate?: number;
+  platformCharge?: number;
 }
-
 interface EditPaymentModalProps {
   payment: Payment | null;
   isOpen: boolean;
@@ -63,7 +61,7 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
     amountInINR: "",
     paymentDate: "",
     platformWallet: "",
-    walletStatus: "pending",
+    walletStatus: "on_hold",
     bankAccount: "",
     bankStatus: "pending",
     notes: "",
@@ -85,13 +83,13 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
         amountInINR: payment.amountInINR?.toString() || "",
         paymentDate: payment.paymentDate ? payment.paymentDate.split("T")[0] : "",
         platformWallet: typeof payment.platformWallet === "object" ? payment.platformWallet._id : payment.platformWallet || "",
-        walletStatus: payment.walletStatus,
+        walletStatus: payment.walletStatus === "released" ? "released" : "on_hold",
         bankAccount: payment.bankAccount
           ? typeof payment.bankAccount === "object"
             ? payment.bankAccount._id
             : payment.bankAccount
           : "",
-        bankStatus: payment.bankStatus,
+        bankStatus: payment.walletStatus === "released" ? "received" : "pending",
         notes: payment.notes || "",
         hoursBilled: payment.hoursBilled?.toString() || "",
         hourlyWorkEntries: (payment.hourlyWorkEntries && Array.isArray(payment.hourlyWorkEntries))
@@ -167,6 +165,17 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
     }
     // eslint-disable-next-line
   }, [formData.hourlyWorkEntries, project?.hourlyRate, hourlyWorkOptions]);
+
+  // --- Wallet/Bank Status Logic ---
+  useEffect(() => {
+    if (formData.walletStatus === "on_hold") {
+      setFormData(f => ({ ...f, bankStatus: "pending" }));
+    } else if (formData.walletStatus === "released") {
+      setFormData(f => ({ ...f, bankStatus: "received" }));
+    }
+    // eslint-disable-next-line
+  }, [formData.walletStatus]);
+  // ---
 
   // Amount in INR: always calculated (never editable)
   const amount = Number(formData.amount) || 0;
@@ -400,7 +409,6 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.walletStatus ? "border-red-500" : "border-gray-300"}`}
                 >
-                  <option value="pending">Pending</option>
                   <option value="on_hold">On Hold</option>
                   <option value="released">Released</option>
                 </select>
@@ -426,15 +434,16 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
               {/* BANK STATUS */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Bank Status *</label>
-                <select
+                <Input
                   name="bankStatus"
-                  value={formData.bankStatus}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.bankStatus ? "border-red-500" : "border-gray-300"}`}
-                >
-                  <option value="pending">Pending</option>
-                  <option value="released">Released</option>
-                </select>
+                  value={
+                    formData.walletStatus === "released"
+                      ? "received"
+                      : "pending"
+                  }
+                  readOnly
+                  className="bg-gray-100 cursor-not-allowed"
+                />
                 {errors.bankStatus && <p className="text-sm text-red-600">{errors.bankStatus}</p>}
               </div>
               {/* HOURLY FIELDS */}
