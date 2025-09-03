@@ -8,5 +8,7 @@ router.post('/', auth, accountController.createAccount);
 router.get('/', auth, accountController.getAccounts);
 router.put('/:accountId', auth, accountController.updateAccount);
 router.delete('/:accountId', auth, accountController.deleteAccount);
+router.get('/:accountId/statement', auth, accountController.getAccountStatement);
+
 
 module.exports = router;

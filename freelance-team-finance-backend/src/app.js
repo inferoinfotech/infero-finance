@@ -36,6 +36,7 @@ app.use('/api/history', historyRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/summary', summaryRoutes);
 app.use('/api/expense-reports', expenseReportsRoutes);
+app.use('/api/reports', require('./routes/report'));
 
 // Global error handler
 app.use((err, req, res, next) => {

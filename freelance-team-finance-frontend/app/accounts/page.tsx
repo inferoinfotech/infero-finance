@@ -1,13 +1,17 @@
 "use client"
 
-import type React from "react"
+import { useEffect } from "react"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+
+import type React from "react"
+import useSWR from "swr"
 import { MainLayout } from "@/components/main-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { apiClient } from "@/lib/api"
 import { Plus, Edit, Trash2, CreditCard, Wallet } from "lucide-react"
 
@@ -19,6 +23,28 @@ interface Account {
   balance?: number
 }
 
+interface StatementTxn {
+  _id: string
+  type: "debit" | "credit"
+  amount: number
+  delta: number
+  balanceAfter: number
+  refType?: string
+  refId?: string
+  remark?: string
+  createdAt: string
+}
+
+interface AccountStatement {
+  account: {
+    _id: string
+    name: string
+    type: string
+    balance?: number
+  }
+  txns: StatementTxn[]
+}
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
@@ -28,30 +54,40 @@ export default function AccountsPage() {
     name: "",
     details: "",
   })
+  const [statementOpen, setStatementOpen] = useState(false)
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+
+  const {
+    data: statement,
+    error: statementError,
+    isLoading: statementLoading,
+  } = useSWR<AccountStatement>(
+    statementOpen && selectedAccount ? `/api/accounts/${selectedAccount._id}/statement` : null,
+    () => apiClient.getAccountStatement(selectedAccount!._id),
+  )
 
   useEffect(() => {
     fetchAccounts()
   }, [])
 
-const fetchAccounts = async () => {
-  try {
-    const data = await apiClient.getAccounts()
-    console.log("Fetched accounts data:", data)
-    if (Array.isArray(data)) {
-      setAccounts(data)
-    } else if (data && Array.isArray(data.accounts)) {
-      setAccounts(data.accounts)
-    } else {
+  const fetchAccounts = async () => {
+    try {
+      const data = await apiClient.getAccounts()
+      console.log("Fetched accounts data:", data)
+      if (Array.isArray(data)) {
+        setAccounts(data)
+      } else if (data && Array.isArray(data.accounts)) {
+        setAccounts(data.accounts)
+      } else {
+        setAccounts([])
+      }
+    } catch (error) {
+      console.error("Failed to fetch accounts:", error)
       setAccounts([])
+    } finally {
+      setLoading(false)
     }
-  } catch (error) {
-    console.error("Failed to fetch accounts:", error)
-    setAccounts([])
-  } finally {
-    setLoading(false)
   }
-}
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -78,6 +114,16 @@ const fetchAccounts = async () => {
         console.error("Failed to delete account:", error)
       }
     }
+  }
+
+  const handleOpenStatement = (account: Account) => {
+    setSelectedAccount(account)
+    setStatementOpen(true)
+  }
+
+  const handleCloseStatement = () => {
+    setStatementOpen(false)
+    setSelectedAccount(null)
   }
 
   const getTypeColor = (type: string) => {
@@ -222,6 +268,15 @@ const fetchAccounts = async () => {
                   </div>
 
                   <div className="flex gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 bg-transparent"
+                      onClick={() => handleOpenStatement(account)}
+                      aria-label={`View statement for ${account.name}`}
+                    >
+                      Statement
+                    </Button>
                     <Button variant="outline" size="sm" className="flex-1 bg-transparent">
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -229,8 +284,13 @@ const fetchAccounts = async () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(account._id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(account._id)
+                      }}
                       className="text-red-600 hover:text-red-700"
+                      aria-label={`Delete ${account.name}`}
+                      title="Delete account"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -247,6 +307,70 @@ const fetchAccounts = async () => {
           </div>
         )}
       </div>
+
+      <Dialog open={statementOpen} onOpenChange={(open) => (open ? setStatementOpen(true) : handleCloseStatement())}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{selectedAccount ? `Statement — ${selectedAccount.name}` : "Statement"}</DialogTitle>
+            <DialogDescription className="text-sm">View recent transactions and running balance.</DialogDescription>
+          </DialogHeader>
+
+          {/* Loading / Error / Empty states */}
+          {statementLoading && <div className="py-8 text-sm text-muted-foreground">Loading statement...</div>}
+
+          {statementError && (
+            <div className="py-4 text-sm text-red-600">Failed to load statement. Please try again.</div>
+          )}
+
+          {!statementLoading && !statementError && statement && (
+            <div className="space-y-4">
+              {/* Account summary */}
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <div className="font-medium">{statement.account.name}</div>
+                  <div className="text-muted-foreground capitalize">{statement.account.type}</div>
+                </div>
+                {typeof statement.account.balance === "number" && (
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Current Balance</div>
+                    <div className="text-lg font-semibold">₹{statement.account.balance.toLocaleString()}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Transactions */}
+              {Array.isArray(statement.txns) && statement.txns.length > 0 ? (
+                <div className="rounded-md border">
+                  <div className="grid grid-cols-6 gap-3 px-4 py-2 text-xs font-medium text-muted-foreground">
+                    <div className="col-span-2">Date</div>
+                    <div>Type</div>
+                    <div className="text-right">Amount</div>
+                    <div className="text-right">Balance</div>
+                    <div>Remark</div>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {statement.txns.map((t) => (
+                      <div key={t._id} className="grid grid-cols-6 gap-3 px-4 py-2 text-sm border-t">
+                        <div className="col-span-2">{new Date(t.createdAt).toLocaleString()}</div>
+                        <div className={t.type === "credit" ? "text-green-600" : "text-red-600"}>{t.type}</div>
+                        <div className="text-right">
+                          {t.type === "credit" ? "+" : "-"}₹{t.amount.toLocaleString()}
+                        </div>
+                        <div className="text-right">₹{t.balanceAfter.toLocaleString()}</div>
+                        <div className="truncate" title={t.remark || ""}>
+                          {t.remark || "-"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8 text-sm text-muted-foreground">No transactions found.</div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   )
 }

@@ -107,6 +107,12 @@ class ApiClient {
     })
   }
 
+  async getAccountStatement(accountId: string) {
+    // Returns shape like:
+    // { account: {...}, txns: [ ... ] }
+    return this.request(`/api/accounts/${accountId}/statement`)
+  }
+
   // Platforms endpoints
   async getPlatforms() {
     return this.request("/api/platforms")
@@ -134,7 +140,7 @@ class ApiClient {
   async getHistory() {
     return this.request("/api/history")
   }
-  
+
   async getProjectPayments(projectId: string) {
     return this.request(`/api/project-payments/project/${projectId}`)
   }
@@ -152,6 +158,21 @@ class ApiClient {
       body: JSON.stringify(paymentData),
     })
   }
+  // lib/api.ts (inside ApiClient class)
+
+// Reports endpoints
+async getIncomeReport(groupBy: "month" | "day" = "month") {
+  return this.request(`/api/reports/income?groupBy=${groupBy}`)
+}
+
+async getExpensesReport(groupBy: "month" | "day" = "month") {
+  return this.request(`/api/reports/expenses?groupBy=${groupBy}`)
+}
+
+async getGeneralExpensesReport(groupBy: "month" | "day" = "month") {
+  return this.request(`/api/reports/general-expenses?groupBy=${groupBy}`)
+}
+
 
   async deleteProjectPayment(paymentId: string) {
     return this.request(`/api/project-payments/${paymentId}`, {
@@ -160,29 +181,28 @@ class ApiClient {
   }
 
   async getHourlyWorkEntries(projectId: string) {
-  // Returns: { logs: HourlyWorkLog[] }
-  const data = await this.request(`/api/hourly-work/project/${projectId}`)
-  return data.logs || []
-}
+    // Returns: { logs: HourlyWorkLog[] }
+    const data = await this.request(`/api/hourly-work/project/${projectId}`)
+    return data.logs || []
+  }
 
-async createHourlyWork(entry: { project: string, weekStart: string, hours: number }) {
-  return this.request("/api/hourly-work", {
-    method: "POST",
-    body: JSON.stringify(entry),
-  })
-}
+  async createHourlyWork(entry: { project: string; weekStart: string; hours: number }) {
+    return this.request("/api/hourly-work", {
+      method: "POST",
+      body: JSON.stringify(entry),
+    })
+  }
 
-async updateHourlyWork(logId: string, update: { hours: number }) {
-  return this.request(`/api/hourly-work/${logId}`, {
-    method: "PUT",
-    body: JSON.stringify(update),
-  })
-}
+  async updateHourlyWork(logId: string, update: { hours: number }) {
+    return this.request(`/api/hourly-work/${logId}`, {
+      method: "PUT",
+      body: JSON.stringify(update),
+    })
+  }
 
-async deleteHourlyWork(logId: string) {
-  return this.request(`/api/hourly-work/${logId}`, { method: "DELETE" })
-}
-  
+  async deleteHourlyWork(logId: string) {
+    return this.request(`/api/hourly-work/${logId}`, { method: "DELETE" })
+  }
 }
 
 export const apiClient = new ApiClient()

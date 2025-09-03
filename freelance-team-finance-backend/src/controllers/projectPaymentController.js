@@ -3,113 +3,218 @@ const ProjectPayment = require('../models/ProjectPayment');
 const Project = require('../models/Project');
 const Account = require('../models/Account');
 const HourlyWork = require('../models/HourlyWork');
+const { postAccountTxn } = require('../utils/ledger');
+
+async function runWithOptionalTx(workFn) {
+  const conn = mongoose.connection;
+  let session = null;
+  let supportsTx = false;
+
+  try {
+    const hello = await conn.db.admin().command({ hello: 1 });
+    supportsTx = Boolean(hello.setName);
+  } catch {
+    supportsTx = false;
+  }
+
+  try {
+    if (supportsTx) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+      const result = await workFn(session);
+      await session.commitTransaction();
+      return result;
+    } else {
+      return await workFn(null);
+    }
+  } catch (err) {
+    if (session) {
+      try { await session.abortTransaction(); } catch {}
+    }
+    throw err;
+  } finally {
+    if (session) session.endSession();
+  }
+}
 
 exports.createPayment = async (req, res, next) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+  runWithOptionalTx(async (session) => {
     const {
       project, amount, platformCharge, conversionRate,
-      amountInINR, platformWallet, walletStatus, walletReceivedDate,
-      bankAccount, bankStatus, bankTransferDate, paymentDate, notes,
+      platformWallet, walletStatus, walletReceivedDate,
+      bankAccount, bankStatus, bankTransferDate,
+      paymentDate, notes,
       hoursBilled, hourlyWorkEntries
     } = req.body;
 
-    // 1. Validate project exists & belongs to user
-    const proj = await Project.findOne({ _id: project, createdBy: req.user.userId }).session(session);
-    if (!proj) {
-      await session.abortTransaction();
-      return res.status(400).json({ error: 'Project not found or not yours' });
-    }
+    // 1) project check
+    const projQuery = Project.findOne({ _id: project, createdBy: req.user.userId });
+    const proj = session ? await projQuery.session(session) : await projQuery;
+    if (!proj) return res.status(400).json({ error: 'Project not found or not yours' });
 
-    let payment;
-    if (proj.priceType === "fixed") {
-      const calcAmountInINR = (amount - platformCharge) * conversionRate;
+    // normalize statuses
+    let _walletStatus = walletStatus || 'on_hold';
+    let _bankStatus = bankStatus || 'pending';
+    if (_walletStatus === 'released') _bankStatus = 'received';
 
-      payment = await ProjectPayment.create([{
+    const pCharge = Number(platformCharge || 0);
+    const conv = Number(conversionRate || 0);
+
+    let createdPayment;
+
+    if (proj.priceType === 'fixed') {
+      const amt = Number(amount || 0);
+      const calcAmountInINR = (amt - pCharge) * conv;
+
+      const doc = {
         project,
-        amount,
-        platformCharge,
-        conversionRate,
+        amount: amt,
+        platformCharge: pCharge,
+        conversionRate: conv,
         amountInINR: calcAmountInINR,
-        platformWallet, walletStatus, walletReceivedDate,
-        bankAccount, bankStatus, bankTransferDate,
-        paymentDate, notes
-      }], { session });
+        platformWallet: platformWallet || null,
+        walletStatus: _walletStatus,
+        walletReceivedDate,
+        bankAccount: bankAccount || null,
+        bankStatus: _bankStatus,
+        bankTransferDate,
+        paymentDate,
+        notes
+      };
+      createdPayment = session
+        ? (await ProjectPayment.create([doc], { session }))[0]
+        : await ProjectPayment.create(doc);
 
-      // 1. Add to wallet
-      if (walletStatus === 'on_hold') {
-        await Account.findByIdAndUpdate(platformWallet, { $inc: { balance: calcAmountInINR } }, { session });
+      // LEDGER ENTRIES:
+      // case A: wallet on hold → CREDIT wallet
+      if (_walletStatus === 'on_hold' && platformWallet) {
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: platformWallet,
+          type: 'credit',
+          amount: calcAmountInINR,
+          refType: 'payment',
+          refId: createdPayment._id,
+          remark: `Payment on-hold (project ${proj._id})`
+        }, session);
+      }
+      // case B: released (or direct bank) → CREDIT bank
+      else if (_bankStatus === 'received' && bankAccount) {
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: bankAccount,
+          type: 'credit',
+          amount: calcAmountInINR,
+          refType: 'payment',
+          refId: createdPayment._id,
+          remark: `Payment received in bank (project ${proj._id})`
+        }, session);
       }
 
-      // 2. Update Project's received so far
-      proj.fixedPrice = (proj.fixedPrice || 0) + Number(amount);
-      await proj.save({ session });
+      // running total for project
+      proj.fixedPrice = (proj.fixedPrice || 0) + amt;
+      await proj.save(session ? { session } : {});
 
-      await session.commitTransaction();
-      return res.status(201).json({ payment: payment[0] });
+      return res.status(201).json({ payment: createdPayment });
     }
 
-    // ========== HOURLY PROJECT PAYMENT ==========
-    if (proj.priceType === "hourly") {
-      const works = await HourlyWork.find({
-        _id: { $in: hourlyWorkEntries },
+    // HOURLY
+    if (proj.priceType === 'hourly') {
+      const logsQuery = HourlyWork.find({
+        _id: { $in: (hourlyWorkEntries || []) },
         project,
         billed: false,
         user: req.user.userId
-      }).session(session);
+      });
+      const works = session ? await logsQuery.session(session) : await logsQuery;
+      if (!works.length) return res.status(400).json({ error: 'No valid hourly work entries selected' });
 
-      if (!works.length) {
-        await session.abortTransaction();
-        return res.status(400).json({ error: "No valid hourly work entries selected" });
-      }
-
-      const totalHours = works.reduce((acc, w) => acc + w.hours, 0);
-      const hourlyRate = proj.hourlyRate || 0;
+      const totalHours = works.reduce((acc, w) => acc + Number(w.hours || 0), 0);
+      const hourlyRate = Number(proj.hourlyRate || 0);
       const calcAmount = totalHours * hourlyRate;
-      const calcAmountInINR = (calcAmount - platformCharge) * conversionRate;
+      const calcAmountInINR = (calcAmount - pCharge) * conv;
 
-      payment = await ProjectPayment.create([{
+      const doc = {
         project,
         amount: calcAmount,
-        platformCharge,
-        conversionRate,
+        platformCharge: pCharge,
+        conversionRate: conv,
         amountInINR: calcAmountInINR,
         hoursBilled: totalHours,
         hourlyWorkEntries: works.map(w => w._id),
-        platformWallet, walletStatus, walletReceivedDate,
-        bankAccount, bankStatus, bankTransferDate,
-        paymentDate, notes
-      }], { session });
+        platformWallet: platformWallet || null,
+        walletStatus: _walletStatus,
+        walletReceivedDate,
+        bankAccount: bankAccount || null,
+        bankStatus: _bankStatus,
+        bankTransferDate,
+        paymentDate,
+        notes
+      };
+      createdPayment = session
+        ? (await ProjectPayment.create([doc], { session }))[0]
+        : await ProjectPayment.create(doc);
 
-      // Mark HourlyWork as billed
       await HourlyWork.updateMany(
         { _id: { $in: works.map(w => w._id) } },
-        { $set: { billed: true, payment: payment[0]._id } },
-        { session }
+        { $set: { billed: true, payment: createdPayment._id } },
+        session ? { session } : {}
       );
 
-      // 1. Add to wallet
-      if (walletStatus === 'on_hold') {
-        await Account.findByIdAndUpdate(platformWallet, { $inc: { balance: calcAmountInINR } }, { session });
+      // LEDGER:
+      if (_walletStatus === 'on_hold' && platformWallet) {
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: platformWallet,
+          type: 'credit',
+          amount: calcAmountInINR,
+          refType: 'payment',
+          refId: createdPayment._id,
+          remark: `Payment on-hold (project ${proj._id})`
+        }, session);
+      } else if (_bankStatus === 'received' && bankAccount) {
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: bankAccount,
+          type: 'credit',
+          amount: calcAmountInINR,
+          refType: 'payment',
+          refId: createdPayment._id,
+          remark: `Payment received in bank (project ${proj._id})`
+        }, session);
       }
 
-      // 2. Update Project's budget (received so far)
-      proj.budget = (proj.budget || 0) + (totalHours * hourlyRate);
-      await proj.save({ session });
-
-      await session.commitTransaction();
-      return res.status(201).json({ payment: payment[0] });
+      proj.budget = (proj.budget || 0) + calcAmount;
+      await proj.save(session ? { session } : {});
+      return res.status(201).json({ payment: createdPayment });
     }
 
-    await session.abortTransaction();
-    return res.status(400).json({ error: "Unknown project type" });
-  } catch (err) {
-    await session.abortTransaction();
-    next(err);
-  } finally {
-    session.endSession();
-  }
+    return res.status(400).json({ error: 'Unknown project type' });
+  }).catch(next);
+};
+
+// --- GET ALL PAYMENTS FOR A PROJECT ---
+exports.getPaymentsForProject = async (req, res, next) => {
+  try {
+    const { projectId } = req.params;
+    const payments = await ProjectPayment.find({ project: projectId })
+      .populate('platformWallet', 'name type')
+      .populate('bankAccount', 'name type')
+      .sort({ paymentDate: -1 });
+  res.json({ payments });
+  } catch (err) { next(err); }
+};
+
+// --- GET SINGLE PAYMENT ---
+exports.getPaymentById = async (req, res, next) => {
+  try {
+    const { paymentId } = req.params;
+    const payment = await ProjectPayment.findById(paymentId)
+      .populate('platformWallet', 'name type')
+      .populate('bankAccount', 'name type');
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    res.json({ payment });
+  } catch (err) { next(err); }
 };
 
 
@@ -141,136 +246,183 @@ exports.getPaymentById = async (req, res, next) => {
   }
 };
 
-
+async function supportsTransactions() {
+  try {
+    const hello = await mongoose.connection.db.admin().command({ hello: 1 });
+    return !!hello.setName; // replica set name exists => transactions supported
+  } catch {
+    return false;
+  }
+}
 // --- UPDATE PAYMENT --- (Wallet/Bank logic)
 exports.updatePayment = async (req, res, next) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const useTx = await supportsTransactions();
+  let session = null;
   try {
+    if (useTx) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    }
     const { paymentId } = req.params;
     const updates = req.body;
+    const opts = session ? { session } : {};
 
-    const payment = await ProjectPayment.findById(paymentId).session(session);
+    const payment = session
+      ? await ProjectPayment.findById(paymentId).session(session)
+      : await ProjectPayment.findById(paymentId);
     if (!payment) {
-      await session.abortTransaction();
+      if (session) await session.abortTransaction();
       return res.status(404).json({ error: 'Payment not found' });
     }
 
-    const project = await Project.findById(payment.project).session(session);
+    const project = session
+      ? await Project.findById(payment.project).session(session)
+      : await Project.findById(payment.project);
     if (!project) {
-      await session.abortTransaction();
+      if (session) await session.abortTransaction();
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    // --- Wallet/Bank Logic ---
     const oldWalletStatus = payment.walletStatus;
-    const oldBankStatus = payment.bankStatus;
     const amountInINR = payment.amountInINR;
-    const walletId = payment.platformWallet;
-    const bankId = payment.bankAccount;
+    const walletId = updates.platformWallet || payment.platformWallet;
+    const bankId = updates.bankAccount || payment.bankAccount;
 
-    // --- Only if wallet status is changed ---
     if (updates.walletStatus && updates.walletStatus !== oldWalletStatus) {
-      // 1. If moving from "on_hold" => "released"
-      if (oldWalletStatus === "on_hold" && updates.walletStatus === "released") {
-        // Deduct from wallet
-        await Account.findByIdAndUpdate(walletId, { $inc: { balance: -amountInINR } }, { session });
-        // Add to bank (if present)
-        if (bankId) {
-          await Account.findByIdAndUpdate(bankId, { $inc: { balance: amountInINR } }, { session });
+      // RELEASE: wallet -> bank
+      if (oldWalletStatus === 'on_hold' && updates.walletStatus === 'released') {
+        if (walletId) {
+          await postAccountTxn({
+            userId: req.user.userId,
+            accountId: walletId,
+            type: 'debit',
+            amount: amountInINR,
+            refType: 'transfer',
+            refId: payment._id,
+            remark: `Release to bank (payment ${payment._id})`
+          }, session);
         }
-        updates.bankStatus = "received"; // enforce this rule
+        if (bankId) {
+          await postAccountTxn({
+            userId: req.user.userId,
+            accountId: bankId,
+            type: 'credit',
+            amount: amountInINR,
+            refType: 'transfer',
+            refId: payment._id,
+            remark: `Received from wallet (payment ${payment._id})`
+          }, session);
+        }
+        updates.bankStatus = 'received';
       }
-      // 2. If reverting "released" => "on_hold" (very rare, but keep logic)
-      if (oldWalletStatus === "released" && updates.walletStatus === "on_hold") {
-        // Add back to wallet
-        await Account.findByIdAndUpdate(walletId, { $inc: { balance: amountInINR } }, { session });
-        // Remove from bank
+
+      // REVERT: bank -> wallet
+      if (oldWalletStatus === 'released' && updates.walletStatus === 'on_hold') {
         if (bankId) {
-          await Account.findByIdAndUpdate(bankId, { $inc: { balance: -amountInINR } }, { session });
+          await postAccountTxn({
+            userId: req.user.userId,
+            accountId: bankId,
+            type: 'debit',
+            amount: amountInINR,
+            refType: 'transfer',
+            refId: payment._id,
+            remark: `Revert to wallet (payment ${payment._id})`
+          }, session);
         }
-        updates.bankStatus = "pending"; // enforce this rule
+        if (walletId) {
+          await postAccountTxn({
+            userId: req.user.userId,
+            accountId: walletId,
+            type: 'credit',
+            amount: amountInINR,
+            refType: 'transfer',
+            refId: payment._id,
+            remark: `Reverted from bank (payment ${payment._id})`
+          }, session);
+        }
+        updates.bankStatus = 'pending';
       }
     }
 
-    // --- Hourly work logic (allow update) ---
+    // Hourly re-selection
     if (project.priceType === 'hourly' && updates.hourlyWorkEntries) {
-      // Mark previously billed as unbilled
       await HourlyWork.updateMany(
         { _id: { $in: payment.hourlyWorkEntries } },
         { $set: { billed: false, payment: null } },
-        { session }
+        opts
       );
-      // Mark new selection as billed
       await HourlyWork.updateMany(
         { _id: { $in: updates.hourlyWorkEntries } },
         { $set: { billed: true, payment: paymentId } },
-        { session }
+        opts
       );
       updates.hoursBilled = updates.hoursBilled || 0;
     }
 
-    // --- Update payment document ---
-    const updated = await ProjectPayment.findByIdAndUpdate(paymentId, updates, { new: true, session });
+    const updated = await ProjectPayment.findByIdAndUpdate(paymentId, updates, { new: true, ...opts });
 
-    // --- Update Project totals after update ---
-    const allPayments = await ProjectPayment.find({ project: project._id });
-    let totalReceived = 0;
-    if (project.priceType === 'fixed') {
-      totalReceived = allPayments.reduce((acc, pay) => acc + (pay.amount || 0), 0);
-      project.fixedPrice = totalReceived;
-      await project.save({ session });
-    } else if (project.priceType === 'hourly') {
-      totalReceived = allPayments.reduce((acc, pay) => acc + (pay.amount || 0), 0);
-      project.budget = totalReceived;
-      await project.save({ session });
-    }
+    // recompute project totals
+    const all = await ProjectPayment.find({ project: project._id });
+    const totalReceived = all.reduce((acc, p) => acc + (p.amount || 0), 0);
+    if (project.priceType === 'fixed') project.fixedPrice = totalReceived;
+    else project.budget = totalReceived;
+    await project.save(opts);
 
-    await session.commitTransaction();
+    if (session) { await session.commitTransaction(); session.endSession(); }
     res.json({ payment: updated });
   } catch (err) {
-    await session.abortTransaction();
+    if (session) { try { await session.abortTransaction(); session.endSession(); } catch {} }
     next(err);
-  } finally {
-    session.endSession();
   }
 };
 
 
-// --- DELETE PAYMENT (optional: revert balances too!) ---
+/* =========================
+ * DELETE PAYMENT
+ * - Revert balances based on current status
+ * ========================= */
 exports.deletePayment = async (req, res, next) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
+  runWithOptionalTx(async (session) => {
     const { paymentId } = req.params;
-    const payment = await ProjectPayment.findByIdAndDelete(paymentId).session(session);
-    if (!payment) {
-      await session.abortTransaction();
-      return res.status(404).json({ error: 'Payment not found' });
-    }
+    const paymentQuery = ProjectPayment.findById(paymentId);
+    const payment = session ? await paymentQuery.session(session) : await paymentQuery;
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
 
-    // On delete, revert balances if still in wallet or bank (depends on wallet/bankStatus)
     const { walletStatus, bankStatus, amountInINR, platformWallet, bankAccount } = payment;
-    if (walletStatus === "on_hold") {
-      await Account.findByIdAndUpdate(platformWallet, { $inc: { balance: -amountInINR } }, { session });
+
+    // wallet on-hold → reverse (DEBIT wallet)
+    if (walletStatus === 'on_hold' && platformWallet) {
+      await postAccountTxn({
+        userId: req.user.userId,
+        accountId: platformWallet,
+        type: 'debit',
+        amount: amountInINR,
+        refType: 'reversal',
+        refId: payment._id,
+        remark: `Delete payment reversal (wallet on-hold)`
+      }, session);
     }
-    if (walletStatus === "released" && bankStatus === "received" && bankAccount) {
-      await Account.findByIdAndUpdate(bankAccount, { $inc: { balance: -amountInINR } }, { session });
+    // released+received → reverse (DEBIT bank)
+    if (walletStatus === 'released' && bankStatus === 'received' && bankAccount) {
+      await postAccountTxn({
+        userId: req.user.userId,
+        accountId: bankAccount,
+        type: 'debit',
+        amount: amountInINR,
+        refType: 'reversal',
+        refId: payment._id,
+        remark: `Delete payment reversal (bank)`
+      }, session);
     }
 
-    // Optionally mark HourlyWork as unbilled
+    // Un-bill hourly logs
     await HourlyWork.updateMany(
       { payment: paymentId },
       { $set: { billed: false, payment: null } },
-      { session }
+      session ? { session } : {}
     );
 
-    await session.commitTransaction();
+    await ProjectPayment.findByIdAndDelete(paymentId).session?.(session) ?? await ProjectPayment.findByIdAndDelete(paymentId);
     res.json({ message: 'Payment deleted' });
-  } catch (err) {
-    await session.abortTransaction();
-    next(err);
-  } finally {
-    session.endSession();
-  }
+  }).catch(next);
 };

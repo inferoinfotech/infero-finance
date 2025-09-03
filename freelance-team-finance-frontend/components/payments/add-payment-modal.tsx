@@ -281,7 +281,7 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
               </div>
               {/* PLATFORM CHARGE */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Platform Charge *</label>
+                <label className="text-sm font-medium">Platform Charge</label>
                 <Input
                   name="platformCharge"
                   type="number"
@@ -333,13 +333,12 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
               </div>
               {/* WALLET */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Wallet Account *</label>
+                <label className="text-sm font-medium">Wallet Account</label>
                 <select
                   name="platformWallet"
                   value={formData.platformWallet}
                   onChange={handleChange}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.platformWallet ? "border-red-500" : "border-gray-300"}`}
-                  required
                 >
                   <option value="">Select Wallet Account</option>
                   {accounts.filter(acc => acc.type === "wallet").map(acc => (
@@ -352,7 +351,7 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
               </div>
               {/* WALLET STATUS */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Wallet Status *</label>
+                <label className="text-sm font-medium">Wallet Status</label>
                 <select
                   name="walletStatus"
                   value={formData.walletStatus}

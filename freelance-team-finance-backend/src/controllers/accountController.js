@@ -1,4 +1,5 @@
 const Account = require('../models/Account');
+const AccountTxn = require('../models/AccountTxn');
 
 // Add new account (bank or wallet)
 exports.createAccount = async (req, res, next) => {
@@ -50,6 +51,28 @@ exports.deleteAccount = async (req, res, next) => {
     const deleted = await Account.findOneAndDelete({ _id: accountId, user: req.user.userId });
     if (!deleted) return res.status(404).json({ error: 'Account not found' });
     res.json({ message: 'Account deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+exports.getAccountStatement = async (req, res, next) => {
+  try {
+    const { accountId } = req.params;
+    const limit = Math.min(Number(req.query.limit || 50), 200);
+    const skip = Math.max(Number(req.query.skip || 0), 0);
+
+    // ensure account belongs to user
+    const acc = await Account.findOne({ _id: accountId, user: req.user.userId });
+    if (!acc) return res.status(404).json({ error: 'Account not found' });
+
+    const txns = await AccountTxn.find({ account: accountId, user: req.user.userId })
+      .sort({ createdAt: 1 }) // oldest -> newest; change to -1 for newest first
+      .skip(skip)
+      .limit(limit);
+
+    res.json({ account: { _id: acc._id, name: acc.name, type: acc.type, balance: acc.balance }, txns });
   } catch (err) {
     next(err);
   }
