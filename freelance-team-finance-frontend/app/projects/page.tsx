@@ -1,20 +1,35 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MainLayout } from "@/components/main-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { ModernMainLayout } from "@/components/modern-main-layout"
+import { ModernButton } from "@/components/ui/modern-button"
+import { ModernInput } from "@/components/ui/modern-input"
+import { ModernSelect } from "@/components/ui/modern-select"
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card"
+import { ModernBadge } from "@/components/ui/modern-badge"
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
 import Link from "next/link"
-import { Plus, Search, Edit, Trash2, Eye } from "lucide-react"
+import { 
+  Plus, 
+  Search, 
+  Edit, 
+  Trash2, 
+  Eye, 
+  Calendar,
+  DollarSign,
+  Clock,
+  Users,
+  Briefcase,
+  Filter,
+  TrendingUp
+} from "lucide-react"
 
 interface Project {
   _id: string
   name: string
   clientName: string
-  platform: string
+  platform: any
   currency: string
   status: string
   startDate: string
@@ -26,38 +41,52 @@ interface Project {
   conversionRate: number
 }
 
-export default function ProjectsPage() {
+const statusOptions = [
+  { value: "", label: "All Status" },
+  { value: "pending", label: "Pending" },
+  { value: "working", label: "Working" },
+  { value: "completed", label: "Completed" },
+  { value: "paused", label: "Paused" },
+  { value: "extended", label: "Extended" },
+]
+
+const priceTypeOptions = [
+  { value: "", label: "All Types" },
+  { value: "fixed", label: "Fixed Price" },
+  { value: "hourly", label: "Hourly Rate" },
+]
+
+export default function ModernProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [priceTypeFilter, setPriceTypeFilter] = useState("")
 
   useEffect(() => {
     fetchProjects()
   }, [])
 
-const fetchProjects = async () => {
-  try {
-    const data = await apiClient.getProjects()
-    // Expecting { projects: [...] }
-    if (data && Array.isArray(data.projects)) {
-      setProjects(data.projects)
-    } else if (Array.isArray(data)) {
-      setProjects(data)
-    } else {
+  const fetchProjects = async () => {
+    try {
+      const data = await apiClient.getProjects()
+      if (data && Array.isArray(data.projects)) {
+        setProjects(data.projects)
+      } else if (Array.isArray(data)) {
+        setProjects(data)
+      } else {
+        setProjects([])
+      }
+    } catch (error) {
+      console.error("Failed to fetch projects:", error)
       setProjects([])
+    } finally {
+      setLoading(false)
     }
-  } catch (error) {
-    console.error("Failed to fetch projects:", error)
-    setProjects([])
-  } finally {
-    setLoading(false)
   }
-}
 
-
-  const handleDelete = async (projectId: string) => {
-    if (confirm("Are you sure you want to delete this project?")) {
+  const handleDelete = async (projectId: string, projectName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${projectName}"? This action cannot be undone.`)) {
       try {
         await apiClient.deleteProject(projectId)
         setProjects(projects.filter((p) => p._id !== projectId))
@@ -68,150 +97,305 @@ const fetchProjects = async () => {
   }
 
   const filteredProjects = projects.filter((project) => {
-    const matchesSearch =
-      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.clientName.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || project.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         project.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = !statusFilter || project.status === statusFilter
+    const matchesPriceType = !priceTypeFilter || project.priceType === priceTypeFilter
+    return matchesSearch && matchesStatus && matchesPriceType
   })
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800"
-      case "completed":
-        return "bg-blue-100 text-blue-800"
-      case "paused":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+      case "pending": return "warning"
+      case "working": return "info"
+      case "completed": return "success"
+      case "paused": return "secondary"
+      case "extended": return "purple"
+      default: return "secondary"
     }
   }
 
+  const getPlatformName = (platform: any) => {
+    if (typeof platform === "object" && platform !== null) {
+      return platform.name
+    }
+    return platform || "Unknown"
+  }
+
+  // Statistics
+  const totalProjects = projects.length
+  const activeProjects = projects.filter(p => p.status === "working" || p.status === "pending").length
+  const completedProjects = projects.filter(p => p.status === "completed").length
+  const totalValue = projects.reduce((sum, p) => sum + (p.fixedPrice || p.hourlyRate || 0), 0)
+
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <ModernMainLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <LoadingSkeleton width={300} height={40} />
+            <LoadingSkeleton width={120} height={40} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <LoadingSkeleton key={i} variant="card" />
+            ))}
+          </div>
+          <LoadingSkeleton variant="card" height={400} />
         </div>
-      </MainLayout>
+      </ModernMainLayout>
     )
   }
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+    <ModernMainLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-            <p className="text-gray-600">Manage your team's projects</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Project Portfolio</h1>
+            <p className="text-gray-600 text-lg">
+              Manage and track all your freelancing projects in one place
+            </p>
           </div>
           <Link href="/projects/create">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Project
-            </Button>
+            <ModernButton>
+              <Plus className="h-4 w-4" />
+              New Project
+            </ModernButton>
           </Link>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search projects..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="completed">Completed</option>
-            <option value="paused">Paused</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <ModernCard variant="gradient">
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-white text-lg">Total Projects</ModernCardTitle>
+                  <p className="text-white/80 text-sm">All time</p>
+                </div>
+                <Briefcase className="h-8 w-8 text-white/80" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-3xl font-bold text-white">{totalProjects}</div>
+            </ModernCardContent>
+          </ModernCard>
+
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Active Projects</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">In progress</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-blue-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">{activeProjects}</div>
+            </ModernCardContent>
+          </ModernCard>
+
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Completed</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Finished projects</p>
+                </div>
+                <Users className="h-8 w-8 text-green-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">{completedProjects}</div>
+            </ModernCardContent>
+          </ModernCard>
+
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Project Value</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Total worth</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-purple-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                ${totalValue.toLocaleString()}
+              </div>
+            </ModernCardContent>
+          </ModernCard>
         </div>
+
+        {/* Filters */}
+        <ModernCard>
+          <ModernCardContent className="p-6">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1">
+                <ModernInput
+                  placeholder="Search projects..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  icon={<Search className="h-4 w-4" />}
+                />
+              </div>
+              <div className="lg:w-48">
+                <ModernSelect
+                  label="Status"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  options={statusOptions}
+                />
+              </div>
+              <div className="lg:w-48">
+                <ModernSelect
+                  label="Price Type"
+                  value={priceTypeFilter}
+                  onChange={(e) => setPriceTypeFilter(e.target.value)}
+                  options={priceTypeOptions}
+                />
+              </div>
+            </div>
+          </ModernCardContent>
+        </ModernCard>
 
         {/* Projects Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <Card key={project._id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
-                    <p className="text-sm text-gray-600">{project.clientName}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredProjects.length === 0 ? (
+            <div className="col-span-full">
+              <ModernCard>
+                <ModernCardContent className="py-16 text-center">
+                  <Briefcase className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No projects found</h3>
+                  <p className="text-gray-500 mb-6">
+                    {projects.length === 0 
+                      ? "Get started by creating your first project"
+                      : "Try adjusting your filters to find what you're looking for"
+                    }
+                  </p>
+                  {projects.length === 0 && (
+                    <Link href="/projects/create">
+                      <ModernButton>
+                        <Plus className="h-4 w-4" />
+                        Create First Project
+                      </ModernButton>
+                    </Link>
+                  )}
+                </ModernCardContent>
+              </ModernCard>
+            </div>
+          ) : (
+            filteredProjects.map((project) => (
+              <ModernCard key={project._id} className="group hover:shadow-xl transition-all duration-300">
+                <ModernCardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <ModernCardTitle className="group-hover:text-blue-600 transition-colors line-clamp-1">
+                        {project.name}
+                      </ModernCardTitle>
+                      <p className="text-gray-600 text-sm mt-1 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {project.clientName}
+                      </p>
+                    </div>
+                    <ModernBadge 
+                      variant={getStatusColor(project.status)}
+                      className="capitalize shrink-0"
+                    >
+                      {project.status}
+                    </ModernBadge>
                   </div>
-                  <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Platform:</span>
-                    <span>{typeof project.platform === "object" ? project.platform.name : project.platform}</span>
+                </ModernCardHeader>
+                
+                <ModernCardContent className="space-y-4">
+                  {/* Project Details */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-500 flex items-center gap-1">
+                        <Briefcase className="h-3 w-3" />
+                        Platform
+                      </p>
+                      <p className="font-medium text-gray-900">
+                        {getPlatformName(project.platform)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" />
+                        Type
+                      </p>
+                      <p className="font-medium text-gray-900 capitalize">
+                        {project.priceType}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Type:</span>
-                    <span className="capitalize">{project.priceType}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Rate:</span>
-                    <span>
-                      {project.priceType === "fixed"
-                        ? `${project.currency} ${project.fixedPrice}`
-                        : `${project.currency} ${project.hourlyRate}/hr`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Duration:</span>
-                    <span>
-                      {new Date(project.startDate).toLocaleDateString()} -{" "}
-                      {new Date(project.endDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="flex gap-2 mt-4">
-                  <Link href={`/projects/${project._id}`} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full bg-transparent">
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                  </Link>
-                  <Link href={`/projects/${project._id}/edit`}>
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(project._id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  {/* Pricing */}
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 text-sm">
+                        {project.priceType === "fixed" ? "Total Value" : "Hourly Rate"}
+                      </span>
+                      <span className="font-bold text-lg text-gray-900">
+                        {project.currency} {
+                          project.priceType === "fixed" 
+                            ? project.fixedPrice?.toLocaleString() || "0"
+                            : `${project.hourlyRate || 0}/hr`
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Timeline */}
+                  <div className="text-sm">
+                    <p className="text-gray-500 flex items-center gap-1 mb-1">
+                      <Calendar className="h-3 w-3" />
+                      Timeline
+                    </p>
+                    <div className="flex items-center justify-between text-gray-900">
+                      <span>{new Date(project.startDate).toLocaleDateString()}</span>
+                      <span className="text-gray-400">→</span>
+                      <span>
+                        {project.endDate 
+                          ? new Date(project.endDate).toLocaleDateString()
+                          : "Ongoing"
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2">
+                    <Link href={`/projects/${project._id}`} className="flex-1">
+                      <ModernButton variant="outline" size="sm" className="w-full">
+                        <Eye className="h-3 w-3" />
+                        View
+                      </ModernButton>
+                    </Link>
+                    <Link href={`/projects/${project._id}/edit`}>
+                      <ModernButton variant="outline" size="sm">
+                        <Edit className="h-3 w-3" />
+                      </ModernButton>
+                    </Link>
+                    <ModernButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(project._id, project.name)}
+                      className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </ModernButton>
+                  </div>
+                </ModernCardContent>
+              </ModernCard>
+            ))
+          )}
         </div>
-
-        {filteredProjects.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No projects found</p>
-          </div>
-        )}
       </div>
-    </MainLayout>
+    </ModernMainLayout>
   )
 }
