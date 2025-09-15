@@ -7,6 +7,7 @@ import type { Lead } from "@/types/lead"
 import { useAuth } from "@/contexts/auth-context"
 import Link from "next/link"
 import { Plus, Search, Filter, RefreshCcw, X, Users, TrendingUp, Clock, DollarSign } from "lucide-react"
+import { ModernMainLayout } from "@/components/modern-main-layout"
 
 const STAGES = [
   "New",
@@ -141,7 +142,7 @@ export default function LeadsPage() {
   }
 
   return (
-    <MainLayout>
+    <ModernMainLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
@@ -600,6 +601,6 @@ export default function LeadsPage() {
           )}
         </div>
       </div>
-    </MainLayout>
+    </ModernMainLayout>
   )
 }

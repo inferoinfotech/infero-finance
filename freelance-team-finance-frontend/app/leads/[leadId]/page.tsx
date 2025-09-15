@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api"
 import type { Lead } from "@/types/lead"
 import Link from "next/link"
 import { Save, ChevronLeft, Trash2, Plus } from "lucide-react"
+import { ModernMainLayout } from "@/components/modern-main-layout"
 
 const STAGES = [
   "New",
@@ -119,14 +120,14 @@ export default function LeadDetailPage() {
 
   if (!lead) {
     return (
-      <MainLayout>
+      <ModernMainLayout>
         <div className="text-gray-500">Loading...</div>
-      </MainLayout>
+      </ModernMainLayout>
     )
   }
 
   return (
-    <MainLayout>
+    <ModernMainLayout>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Link href="/leads" className="inline-flex items-center gap-1 px-3 py-1 rounded border hover:bg-gray-50">
@@ -327,6 +328,6 @@ export default function LeadDetailPage() {
           </div>
         </div>
       </div>
-    </MainLayout>
+    </ModernMainLayout>
   )
 }
