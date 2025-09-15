@@ -4,10 +4,13 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
 
+export type Role = "admin" | "owner" | "sales" | "developer"
+
 interface User {
   id: string
   name: string
   email: string
+  role: Role
 }
 
 interface AuthContextType {
@@ -29,43 +32,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem("token")
     const storedUser = localStorage.getItem("user")
-
     if (storedToken && storedUser) {
       setToken(storedToken)
-      setUser(JSON.parse(storedUser))
+      try {
+        const u = JSON.parse(storedUser)
+        setUser(u)
+      } catch {
+        localStorage.removeItem("user")
+      }
     }
-
     setLoading(false)
   }, [])
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await apiClient.login({ email, password })
-      const { token: newToken, user: newUser } = response
-
-      localStorage.setItem("token", newToken)
-      localStorage.setItem("user", JSON.stringify(newUser))
-
-      setToken(newToken)
-      setUser(newUser)
-    } catch (error) {
-      throw error
-    }
+    const response = await apiClient.login({ email, password })
+    const { token: newToken, user: newUser } = response as { token: string; user: User }
+    localStorage.setItem("token", newToken)
+    localStorage.setItem("user", JSON.stringify(newUser))
+    setToken(newToken)
+    setUser(newUser)
   }
 
   const register = async (name: string, email: string, password: string) => {
-    try {
-      const response = await apiClient.register({ name, email, password })
-      const { token: newToken, user: newUser } = response
-
-      localStorage.setItem("token", newToken)
-      localStorage.setItem("user", JSON.stringify(newUser))
-
-      setToken(newToken)
-      setUser(newUser)
-    } catch (error) {
-      throw error
-    }
+    const response = await apiClient.register({ name, email, password })
+    const { token: newToken, user: newUser } = response as { token: string; user: User }
+    localStorage.setItem("token", newToken)
+    localStorage.setItem("user", JSON.stringify(newUser))
+    setToken(newToken)
+    setUser(newUser)
   }
 
   const logout = () => {
@@ -76,7 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
   )
 }
 
