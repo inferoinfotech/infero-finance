@@ -13,6 +13,7 @@ const historyRoutes = require('./routes/history');
 const notificationsRoutes = require('./routes/notifications');
 const summaryRoutes = require('./routes/summary');
 const expenseReportsRoutes = require('./routes/expenseReports');
+const leadsRoutes = require('./routes/leads');
 const app = express();
 
 // Middleware
@@ -37,6 +38,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/summary', summaryRoutes);
 app.use('/api/expense-reports', expenseReportsRoutes);
 app.use('/api/reports', require('./routes/report'));
+app.use('/api/leads', leadsRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

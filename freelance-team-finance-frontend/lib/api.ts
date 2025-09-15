@@ -203,6 +203,36 @@ async getGeneralExpensesReport(groupBy: "month" | "day" = "month") {
   async deleteHourlyWork(logId: string) {
     return this.request(`/api/hourly-work/${logId}`, { method: "DELETE" })
   }
+
+
+  // ------- Leads -------
+  async createLead(data: any) {
+    return this.request("/api/leads", { method: "POST", body: JSON.stringify(data) })
+  }
+  async getLeads(params?: {
+    q?: string; stage?: string; priority?: string; platform?: string; assignedTo?: string;
+    nextFrom?: string; nextTo?: string; page?: number; limit?: number;
+  }) {
+    const qs = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && `${v}`.length) qs.append(k, `${v}`)
+      })
+    }
+    return this.request(`/api/leads?${qs.toString()}`)
+  }
+  async getLead(leadId: string) {
+    return this.request(`/api/leads/${leadId}`)
+  }
+  async updateLead(leadId: string, data: any) {
+    return this.request(`/api/leads/${leadId}`, { method: "PUT", body: JSON.stringify(data) })
+  }
+  async deleteLead(leadId: string) {
+    return this.request(`/api/leads/${leadId}`, { method: "DELETE" })
+  }
+  async addFollowUp(leadId: string, data: { date: string; clientResponse?: string; notes?: string; nextFollowUpDate?: string }) {
+    return this.request(`/api/leads/${leadId}/follow-ups`, { method: "POST", body: JSON.stringify(data) })
+  }
 }
 
 export const apiClient = new ApiClient()

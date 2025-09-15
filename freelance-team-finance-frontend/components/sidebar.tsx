@@ -7,6 +7,7 @@ import { LayoutDashboard, FolderOpen, Receipt, Wallet, Settings, History, Bell, 
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Leads", href: "/leads", icon: FileText },
   { name: "Projects", href: "/projects", icon: FolderOpen },
   { name: "Expenses", href: "/expenses", icon: Receipt },
   { name: "Accounts", href: "/accounts", icon: Wallet },
