@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { MainLayout } from "@/components/main-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModernMainLayout } from "@/components/modern-main-layout"
+import { ModernButton } from "@/components/ui/modern-button"
+import { ModernInput } from "@/components/ui/modern-input"
+import { ModernSelect } from "@/components/ui/modern-select"
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card"
 import { apiClient } from "@/lib/api"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, FolderOpen, Users, Globe, DollarSign, Calendar } from "lucide-react"
 import Link from "next/link"
 
-export default function CreateProjectPage() {
+export default function ModernCreateProjectPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [platforms, setPlatforms] = useState<any[]>([])
@@ -24,8 +25,9 @@ export default function CreateProjectPage() {
     endDate: "",
     priceType: "fixed",
     hourlyRate: "",
-    budget: "", // For fixed price only!
+    budget: "",
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     async function fetchPlatforms() {
@@ -39,8 +41,31 @@ export default function CreateProjectPage() {
     fetchPlatforms()
   }, [])
 
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+    if (!formData.name.trim()) newErrors.name = "Project name is required"
+    if (!formData.clientName.trim()) newErrors.clientName = "Client name is required"
+    if (!formData.platform) newErrors.platform = "Please select a platform"
+    if (!formData.startDate) newErrors.startDate = "Start date is required"
+    
+    if (formData.priceType === "fixed") {
+      if (!formData.budget || Number(formData.budget) <= 0) {
+        newErrors.budget = "Budget must be greater than 0"
+      }
+    } else {
+      if (!formData.hourlyRate || Number(formData.hourlyRate) <= 0) {
+        newErrors.hourlyRate = "Hourly rate must be greater than 0"
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validateForm()) return
+    
     setLoading(true)
     try {
       const payload: any = {
@@ -65,175 +90,211 @@ export default function CreateProjectPage() {
       router.push("/projects")
     } catch (error) {
       console.error("Failed to create project:", error)
+      setErrors({ submit: "Failed to create project. Please try again." })
     } finally {
       setLoading(false)
     }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+    const { name, value } = e.target
+    setFormData({ ...formData, [name]: value })
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: "" })
+    }
   }
 
   return (
-    <MainLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+    <ModernMainLayout>
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Header */}
         <div className="flex items-center gap-4">
           <Link href="/projects">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
+            <ModernButton variant="outline">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Projects
+            </ModernButton>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Create Project</h1>
-            <p className="text-gray-600">Add a new project to your portfolio</p>
+            <h1 className="text-4xl font-bold text-gray-900">Create New Project</h1>
+            <p className="text-gray-600 text-lg">Add a new project to your portfolio</p>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Name, Client Name, Platform, Currency, Status, Start, End */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Project Name *</label>
-                  <Input
+
+        <ModernCard>
+          <ModernCardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                <FolderOpen className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <ModernCardTitle className="text-2xl">Project Details</ModernCardTitle>
+                <p className="text-gray-600 mt-1">Fill in the information below to create your project</p>
+              </div>
+            </div>
+          </ModernCardHeader>
+          
+          <ModernCardContent>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+                  {errors.submit}
+                </div>
+              )}
+
+              {/* Basic Information */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ModernInput
+                    label="Project Name"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    required
                     placeholder="Enter project name"
+                    icon={<FolderOpen className="h-4 w-4" />}
+                    error={errors.name}
                   />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Client Name *</label>
-                  <Input
+
+                  <ModernInput
+                    label="Client Name"
                     name="clientName"
                     value={formData.clientName}
                     onChange={handleChange}
-                    required
                     placeholder="Enter client name"
+                    icon={<Users className="h-4 w-4" />}
+                    error={errors.clientName}
                   />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Platform *</label>
-                  <select
+
+                  <ModernSelect
+                    label="Platform"
                     name="platform"
                     value={formData.platform}
                     onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Platform</option>
-                    {platforms.map((plat: any) => (
-                      <option key={plat._id} value={plat._id}>
-                        {plat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Currency *</label>
-                  <select
+                    options={[
+                      { value: "", label: "Select Platform" },
+                      ...platforms.map((plat: any) => ({ value: plat._id, label: plat.name }))
+                    ]}
+                    error={errors.platform}
+                  />
+
+                  <ModernSelect
+                    label="Currency"
                     name="currency"
                     value={formData.currency}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="INR">INR</option>
-                  </select>
+                    options={[
+                      { value: "USD", label: "USD - US Dollar" },
+                      { value: "EUR", label: "EUR - Euro" },
+                      { value: "GBP", label: "GBP - British Pound" },
+                      { value: "INR", label: "INR - Indian Rupee" }
+                    ]}
+                  />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Status *</label>
-                  <select
+              </div>
+
+              {/* Project Configuration */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  Project Configuration
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ModernSelect
+                    label="Status"
                     name="status"
                     value={formData.status}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="completed">Completed</option>
-                    <option value="working">Working</option>
-                    <option value="extended">Extended</option>
-                    <option value="paused">Paused</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Price Type *</label>
-                  <select
+                    options={[
+                      { value: "pending", label: "Pending" },
+                      { value: "working", label: "Working" },
+                      { value: "completed", label: "Completed" },
+                      { value: "extended", label: "Extended" },
+                      { value: "paused", label: "Paused" }
+                    ]}
+                  />
+
+                  <ModernSelect
+                    label="Price Type"
                     name="priceType"
                     value={formData.priceType}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="fixed">Fixed Price</option>
-                    <option value="hourly">Hourly Rate</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Start Date *</label>
-                  <Input name="startDate" type="date" value={formData.startDate} onChange={handleChange} required />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">End Date </label>
-                  <Input name="endDate" type="date" value={formData.endDate} onChange={handleChange} />
+                    options={[
+                      { value: "fixed", label: "Fixed Price" },
+                      { value: "hourly", label: "Hourly Rate" }
+                    ]}
+                  />
+
+                  <ModernInput
+                    label="Start Date"
+                    name="startDate"
+                    type="date"
+                    value={formData.startDate}
+                    onChange={handleChange}
+                    icon={<Calendar className="h-4 w-4" />}
+                    error={errors.startDate}
+                  />
+
+                  <ModernInput
+                    label="End Date"
+                    name="endDate"
+                    type="date"
+                    value={formData.endDate}
+                    onChange={handleChange}
+                    icon={<Calendar className="h-4 w-4" />}
+                  />
                 </div>
               </div>
-              {/* Show fields based on project type */}
-              {formData.priceType === "fixed" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Total Budget *</label>
-                  <Input
+
+              {/* Pricing */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  Pricing Details
+                </h3>
+                {formData.priceType === "fixed" ? (
+                  <ModernInput
+                    label="Total Budget"
                     name="budget"
                     type="number"
                     step="0.01"
                     value={formData.budget}
                     onChange={handleChange}
-                    required
                     placeholder="e.g., 10000"
+                    icon={<DollarSign className="h-4 w-4" />}
+                    error={errors.budget}
                   />
-                  <span className="text-xs text-gray-500">Total amount in selected currency</span>
-                </div>
-              )}
-              {formData.priceType === "hourly" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Hourly Rate *</label>
-                  <Input
+                ) : (
+                  <ModernInput
+                    label="Hourly Rate"
                     name="hourlyRate"
                     type="number"
                     step="0.01"
                     value={formData.hourlyRate}
                     onChange={handleChange}
-                    required
                     placeholder="Enter hourly rate"
+                    icon={<DollarSign className="h-4 w-4" />}
+                    error={errors.hourlyRate}
                   />
-                </div>
-              )}
-              <div className="flex gap-4 pt-4">
-                <Button type="submit" disabled={loading} className="flex-1">
-                  {loading ? "Creating..." : "Create Project"}
-                </Button>
+                )}
+              </div>
+
+              <div className="flex gap-4 pt-6">
+                <ModernButton type="submit" loading={loading} className="flex-1">
+                  Create Project
+                </ModernButton>
                 <Link href="/projects" className="flex-1">
-                  <Button type="button" variant="outline" className="w-full bg-transparent">
+                  <ModernButton type="button" variant="outline" className="w-full">
                     Cancel
-                  </Button>
+                  </ModernButton>
                 </Link>
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </ModernCardContent>
+        </ModernCard>
       </div>
-    </MainLayout>
+    </ModernMainLayout>
   )
 }

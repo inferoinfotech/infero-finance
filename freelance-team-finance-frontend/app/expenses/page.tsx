@@ -1,15 +1,36 @@
 "use client"
 
-import type React from "react"
-
 import { useEffect, useState } from "react"
-import { MainLayout } from "@/components/main-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { ModernMainLayout } from "@/components/modern-main-layout"
+import { ModernButton } from "@/components/ui/modern-button"
+import { ModernInput } from "@/components/ui/modern-input"
+import { ModernSelect } from "@/components/ui/modern-select"
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card"
+import { ModernBadge } from "@/components/ui/modern-badge"
+import { ModernTable, ModernTableBody, ModernTableCell, ModernTableHead, ModernTableHeader, ModernTableRow } from "@/components/ui/modern-table"
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { apiClient } from "@/lib/api"
-import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { 
+  Plus, 
+  Search, 
+  Edit, 
+  Trash2, 
+  Receipt, 
+  CreditCard, 
+  Wallet, 
+  DollarSign,
+  Calendar,
+  User,
+  FileText,
+  TrendingDown
+} from "lucide-react"
+
+interface Account {
+  _id: string
+  name: string
+  type: string
+}
 
 interface Expense {
   _id: string
@@ -17,21 +38,21 @@ interface Expense {
   name: string
   amount: number
   date: string
-  withdrawAccount?: string
+  withdrawAccount?: string | Account
   notes: string
-  user: {
+  createdBy?: {
     name: string
     email: string
   }
 }
 
-export default function ExpensesPage() {
+export default function ModernExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [typeFilter, setTypeFilter] = useState("")
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [formData, setFormData] = useState({
     type: "general",
     name: "",
@@ -40,37 +61,49 @@ export default function ExpensesPage() {
     withdrawAccount: "",
     notes: "",
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetchExpenses()
+    fetchAccounts()
   }, [])
 
-  useEffect(() => {
-    apiClient.getAccounts().then(data => {
-      setAccounts(Array.isArray(data) ? data : (data.accounts || []));
-    });
-  }, []);
-
-const fetchExpenses = async () => {
-  try {
-    const data = await apiClient.getExpenses();
-    // SUPPORT BOTH SHAPES
-    const expensesArr = Array.isArray(data)
-      ? data
-      : Array.isArray(data.expenses)
-        ? data.expenses
-        : [];
-    setExpenses(expensesArr);
-  } catch (error) {
-    console.error("Failed to fetch expenses:", error);
-  } finally {
-    setLoading(false);
+  const fetchAccounts = async () => {
+    try {
+      const data = await apiClient.getAccounts()
+      setAccounts(Array.isArray(data) ? data : (data.accounts || []))
+    } catch (error) {
+      console.error("Failed to fetch accounts:", error)
+    }
   }
-};
 
+  const fetchExpenses = async () => {
+    try {
+      const data = await apiClient.getExpenses()
+      const expensesArr = Array.isArray(data) ? data : Array.isArray(data.expenses) ? data.expenses : []
+      setExpenses(expensesArr)
+    } catch (error) {
+      console.error("Failed to fetch expenses:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+    if (!formData.name.trim()) newErrors.name = "Expense name is required"
+    if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = "Amount must be greater than 0"
+    if (!formData.date) newErrors.date = "Date is required"
+    if (!formData.withdrawAccount) newErrors.withdrawAccount = "Please select an account"
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validateForm()) return
+
     try {
       const expenseData = {
         ...formData,
@@ -86,14 +119,16 @@ const fetchExpenses = async () => {
         withdrawAccount: "",
         notes: "",
       })
+      setErrors({})
       fetchExpenses()
     } catch (error) {
       console.error("Failed to create expense:", error)
+      setErrors({ submit: "Failed to create expense. Please try again." })
     }
   }
 
-  const handleDelete = async (expenseId: string) => {
-    if (confirm("Are you sure you want to delete this expense?")) {
+  const handleDelete = async (expenseId: string, expenseName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${expenseName}"? This action cannot be undone.`)) {
       try {
         await apiClient.request(`/api/expenses/${expenseId}`, { method: "DELETE" })
         setExpenses(expenses.filter((e) => e._id !== expenseId))
@@ -104,271 +139,348 @@ const fetchExpenses = async () => {
   }
 
   const filteredExpenses = expenses.filter((expense) => {
-    const matchesSearch =
-      expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      expense.notes.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = typeFilter === "all" || expense.type === typeFilter
+    const matchesSearch = expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         expense.notes.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesType = !typeFilter || expense.type === typeFilter
     return matchesSearch && matchesType
   })
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "general":
-        return "bg-blue-100 text-blue-800"
-      case "personal":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+      case "general": return "info"
+      case "personal": return "success"
+      default: return "secondary"
     }
   }
 
+  const getAccountName = (account: string | Account | undefined) => {
+    if (!account) return "—"
+    if (typeof account === "object") return account.name
+    const foundAccount = accounts.find(a => a._id === account)
+    return foundAccount?.name || account
+  }
+
+  // Statistics
   const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const generalExpenses = filteredExpenses.filter(e => e.type === "general").reduce((sum, e) => sum + e.amount, 0)
+  const personalExpenses = filteredExpenses.filter(e => e.type === "personal").reduce((sum, e) => sum + e.amount, 0)
 
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <ModernMainLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <LoadingSkeleton width={300} height={40} />
+            <LoadingSkeleton width={120} height={40} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <LoadingSkeleton key={i} variant="card" />
+            ))}
+          </div>
+          <LoadingSkeleton variant="card" height={400} />
         </div>
-      </MainLayout>
+      </ModernMainLayout>
     )
   }
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+    <ModernMainLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Expenses & Withdrawals</h1>
-            <p className="text-gray-600">Track team expenses and personal withdrawals</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Expense Management</h1>
+            <p className="text-gray-600 text-lg">
+              Track team expenses and personal withdrawals efficiently
+            </p>
           </div>
-          <Button onClick={() => setShowAddForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+          <ModernButton onClick={() => setShowAddForm(true)}>
+            <Plus className="h-4 w-4" />
             Add Expense
-          </Button>
+          </ModernButton>
         </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Total Expenses</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹{totalExpenses.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">General Expenses</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ₹
-                {filteredExpenses
-                  .filter((e) => e.type === "general")
-                  .reduce((sum, e) => sum + e.amount, 0)
-                  .toLocaleString()}
+          <ModernCard variant="gradient">
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-white text-lg">Total Expenses</ModernCardTitle>
+                  <p className="text-white/80 text-sm">All categories</p>
+                </div>
+                <TrendingDown className="h-8 w-8 text-white/80" />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Personal Withdrawals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ₹
-                {filteredExpenses
-                  .filter((e) => e.type === "personal")
-                  .reduce((sum, e) => sum + e.amount, 0)
-                  .toLocaleString()}
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-3xl font-bold text-white">
+                ₹{totalExpenses.toLocaleString()}
               </div>
-            </CardContent>
-          </Card>
+            </ModernCardContent>
+          </ModernCard>
+
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">General Expenses</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Business costs</p>
+                </div>
+                <Receipt className="h-8 w-8 text-blue-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                ₹{generalExpenses.toLocaleString()}
+              </div>
+            </ModernCardContent>
+          </ModernCard>
+
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Personal Withdrawals</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Team withdrawals</p>
+                </div>
+                <Wallet className="h-8 w-8 text-green-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                ₹{personalExpenses.toLocaleString()}
+              </div>
+            </ModernCardContent>
+          </ModernCard>
         </div>
 
         {/* Filters */}
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search expenses..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Types</option>
-            <option value="general">General</option>
-            <option value="personal">Personal</option>
-          </select>
-        </div>
+        <ModernCard>
+          <ModernCardContent className="p-6">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1">
+                <ModernInput
+                  placeholder="Search expenses..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  icon={<Search className="h-4 w-4" />}
+                />
+              </div>
+              <div className="lg:w-48">
+                <ModernSelect
+                  label="Filter by Type"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  options={[
+                    { value: "", label: "All Types" },
+                    { value: "general", label: "General" },
+                    { value: "personal", label: "Personal" }
+                  ]}
+                />
+              </div>
+            </div>
+          </ModernCardContent>
+        </ModernCard>
 
-        {/* Add Expense Form */}
-        {showAddForm && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Expense</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Type *</label>
-                    <select
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="general">General Expense</option>
-                      <option value="personal">Personal Withdrawal</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Name *</label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
-                      placeholder="Enter expense name"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Amount *</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      required
-                      placeholder="Enter amount"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date *</label>
-                    <Input
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  {formData.type === "personal" && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Withdraw Account</label>
-                      <Input
-                        value={formData.withdrawAccount}
-                        onChange={(e) => setFormData({ ...formData, withdrawAccount: e.target.value })}
-                        placeholder="Account used for withdrawal"
-                      />
-                    </div>
-                  )}
+        {/* Add Expense Modal */}
+        <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">Add New Expense</DialogTitle>
+            </DialogHeader>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+                  {errors.submit}
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Notes</label>
-                  <Input
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Additional notes"
-                  />
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <ModernSelect
+                  label="Expense Type"
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  options={[
+                    { value: "general", label: "General Expense" },
+                    { value: "personal", label: "Personal Withdrawal" }
+                  ]}
+                />
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Withdraw Account *</label>
-                  <select
-                    value={formData.withdrawAccount}
-                    onChange={e => setFormData({ ...formData, withdrawAccount: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Account</option>
-                    {accounts.map(acc => (
-                      <option key={acc._id} value={acc._id}>
-                        {acc.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-4">
-                  <Button type="submit">Add Expense</Button>
-                  <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+                <ModernInput
+                  label="Expense Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter expense name"
+                  icon={<FileText className="h-4 w-4" />}
+                  error={errors.name}
+                />
 
-        {/* Expenses List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Expenses List</CardTitle>
-          </CardHeader>
-          <CardContent>
+                <ModernInput
+                  label="Amount"
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  placeholder="Enter amount"
+                  icon={<DollarSign className="h-4 w-4" />}
+                  error={errors.amount}
+                />
+
+                <ModernInput
+                  label="Date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  icon={<Calendar className="h-4 w-4" />}
+                  error={errors.date}
+                />
+
+                <ModernSelect
+                  label="Withdraw Account"
+                  value={formData.withdrawAccount}
+                  onChange={(e) => setFormData({ ...formData, withdrawAccount: e.target.value })}
+                  options={[
+                    { value: "", label: "Select Account" },
+                    ...accounts.map(acc => ({ value: acc._id, label: `${acc.name} (${acc.type})` }))
+                  ]}
+                  error={errors.withdrawAccount}
+                />
+              </div>
+
+              <ModernInput
+                label="Notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Additional notes (optional)"
+              />
+
+              <div className="flex gap-4 pt-4">
+                <ModernButton type="submit" className="flex-1">
+                  Add Expense
+                </ModernButton>
+                <ModernButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddForm(false)
+                    setFormData({
+                      type: "general",
+                      name: "",
+                      amount: "",
+                      date: new Date().toISOString().split("T")[0],
+                      withdrawAccount: "",
+                      notes: "",
+                    })
+                    setErrors({})
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </ModernButton>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Expenses Table */}
+        <ModernCard>
+          <ModernCardHeader>
+            <div className="flex items-center justify-between">
+              <ModernCardTitle className="text-xl">All Expenses</ModernCardTitle>
+              <ModernBadge variant="secondary">
+                {filteredExpenses.length} of {expenses.length}
+              </ModernBadge>
+            </div>
+          </ModernCardHeader>
+          <ModernCardContent className="p-0">
             {filteredExpenses.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No expenses found</p>
+              <div className="text-center py-12">
+                <Receipt className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 text-lg">No expenses found</p>
+                <p className="text-gray-400">Try adjusting your filters or add a new expense</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredExpenses.map((expense) => (
-  <div key={expense._id} className="border rounded-lg p-4">
-    <div className="flex justify-between items-start">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <h3 className="font-medium">{expense.name}</h3>
-          <Badge className={getTypeColor(expense.type)}>{expense.type}</Badge>
-        </div>
-        <div className="text-sm text-gray-600">
-          <p>Amount: {expense.amount}</p>
-          <p>Date: {new Date(expense.date).toLocaleDateString()}</p>
-          <p>By: {expense.createdBy?.name || "-"}</p>
-          {expense.withdrawAccount && (
-            <p>
-              Account: {typeof expense.withdrawAccount === "object"
-                ? expense.withdrawAccount.name
-                : expense.withdrawAccount}
-            </p>
-          )}
-          {expense.notes && <p>Notes: {expense.notes}</p>}
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm">
-          <Edit className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleDelete(expense._id)}
-          className="text-red-600 hover:text-red-700"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  </div>
-                ))}
-              </div>
+              <ModernTable>
+                <ModernTableHeader>
+                  <ModernTableRow>
+                    <ModernTableHead>Expense</ModernTableHead>
+                    <ModernTableHead>Type</ModernTableHead>
+                    <ModernTableHead>Amount</ModernTableHead>
+                    <ModernTableHead>Date</ModernTableHead>
+                    <ModernTableHead>Account</ModernTableHead>
+                    <ModernTableHead>Created By</ModernTableHead>
+                    <ModernTableHead className="text-right">Actions</ModernTableHead>
+                  </ModernTableRow>
+                </ModernTableHeader>
+                <ModernTableBody>
+                  {filteredExpenses.map((expense) => (
+                    <ModernTableRow key={expense._id}>
+                      <ModernTableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                            <Receipt className="h-5 w-5 text-red-600" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">{expense.name}</div>
+                            {expense.notes && (
+                              <div className="text-sm text-gray-500 line-clamp-1">{expense.notes}</div>
+                            )}
+                          </div>
+                        </div>
+                      </ModernTableCell>
+                      <ModernTableCell>
+                        <ModernBadge variant={getTypeColor(expense.type)} className="capitalize">
+                          {expense.type}
+                        </ModernBadge>
+                      </ModernTableCell>
+                      <ModernTableCell>
+                        <div className="font-semibold text-lg text-red-600">
+                          -₹{expense.amount.toLocaleString()}
+                        </div>
+                      </ModernTableCell>
+                      <ModernTableCell>
+                        <div className="text-sm">
+                          {new Date(expense.date).toLocaleDateString()}
+                        </div>
+                      </ModernTableCell>
+                      <ModernTableCell>
+                        <div className="text-gray-600">
+                          {getAccountName(expense.withdrawAccount)}
+                        </div>
+                      </ModernTableCell>
+                      <ModernTableCell>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm text-gray-600">
+                            {expense.createdBy?.name || "—"}
+                          </span>
+                        </div>
+                      </ModernTableCell>
+                      <ModernTableCell className="text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <ModernButton variant="outline" size="sm">
+                            <Edit className="h-4 w-4" />
+                          </ModernButton>
+                          <ModernButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(expense._id, expense.name)}
+                            className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </ModernButton>
+                        </div>
+                      </ModernTableCell>
+                    </ModernTableRow>
+                  ))}
+                </ModernTableBody>
+              </ModernTable>
             )}
-          </CardContent>
-        </Card>
+          </ModernCardContent>
+        </ModernCard>
       </div>
-    </MainLayout>
+    </ModernMainLayout>
   )
 }

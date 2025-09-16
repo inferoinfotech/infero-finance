@@ -1,12 +1,23 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MainLayout } from "@/components/main-layout"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { ModernMainLayout } from "@/components/modern-main-layout"
+import { ModernButton } from "@/components/ui/modern-button"
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card"
+import { ModernBadge } from "@/components/ui/modern-badge"
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
-import { Bell, Check, Clock, AlertCircle, Info } from "lucide-react"
+import { 
+  Bell, 
+  Check, 
+  Clock, 
+  AlertCircle, 
+  Info, 
+  DollarSign, 
+  Receipt, 
+  CheckCheck,
+  BellRing
+} from "lucide-react"
 
 interface Notification {
   _id: string
@@ -17,9 +28,10 @@ interface Notification {
   data?: any
 }
 
-export default function NotificationsPage() {
+export default function ModernNotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [markingAllRead, setMarkingAllRead] = useState(false)
 
   useEffect(() => {
     fetchNotifications()
@@ -28,9 +40,10 @@ export default function NotificationsPage() {
   const fetchNotifications = async () => {
     try {
       const data = await apiClient.getNotifications()
-      setNotifications(data)
+      setNotifications(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error("Failed to fetch notifications:", error)
+      setNotifications([])
     } finally {
       setLoading(false)
     }
@@ -47,157 +60,221 @@ export default function NotificationsPage() {
 
   const markAllAsRead = async () => {
     try {
+      setMarkingAllRead(true)
       const unreadNotifications = notifications.filter((n) => !n.read)
       await Promise.all(unreadNotifications.map((n) => apiClient.markNotificationAsRead(n._id)))
       setNotifications(notifications.map((n) => ({ ...n, read: true })))
     } catch (error) {
       console.error("Failed to mark all notifications as read:", error)
+    } finally {
+      setMarkingAllRead(false)
     }
   }
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "payment":
-        return "bg-green-100 text-green-800"
-      case "expense":
-        return "bg-blue-100 text-blue-800"
-      case "reminder":
-        return "bg-yellow-100 text-yellow-800"
-      case "alert":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+      case "payment": return "success"
+      case "expense": return "info"
+      case "reminder": return "warning"
+      case "alert": return "danger"
+      default: return "secondary"
     }
   }
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case "payment":
-        return Info
-      case "expense":
-        return AlertCircle
-      case "reminder":
-        return Clock
-      case "alert":
-        return AlertCircle
-      default:
-        return Bell
+      case "payment": return <DollarSign className="h-5 w-5" />
+      case "expense": return <Receipt className="h-5 w-5" />
+      case "reminder": return <Clock className="h-5 w-5" />
+      case "alert": return <AlertCircle className="h-5 w-5" />
+      default: return <Bell className="h-5 w-5" />
     }
   }
 
   const unreadCount = notifications.filter((n) => !n.read).length
+  const todayCount = notifications.filter(n => 
+    new Date(n.createdAt).toDateString() === new Date().toDateString()
+  ).length
 
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <ModernMainLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <LoadingSkeleton width={300} height={40} />
+            <LoadingSkeleton width={120} height={40} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <LoadingSkeleton key={i} variant="card" />
+            ))}
+          </div>
+          <LoadingSkeleton variant="card" height={400} />
         </div>
-      </MainLayout>
+      </ModernMainLayout>
     )
   }
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+    <ModernMainLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-            <p className="text-gray-600">Stay updated with your team's activities</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Notifications</h1>
+            <p className="text-gray-600 text-lg">
+              Stay updated with your team's activities and important alerts
+            </p>
           </div>
           {unreadCount > 0 && (
-            <Button onClick={markAllAsRead}>
-              <Check className="h-4 w-4 mr-2" />
+            <ModernButton onClick={markAllAsRead} loading={markingAllRead}>
+              <CheckCheck className="h-4 w-4" />
               Mark All as Read ({unreadCount})
-            </Button>
+            </ModernButton>
           )}
         </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Total</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{notifications.length}</div>
-            </CardContent>
-          </Card>
+          <ModernCard variant="gradient">
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-white text-lg">Total</ModernCardTitle>
+                  <p className="text-white/80 text-sm">All notifications</p>
+                </div>
+                <Bell className="h-8 w-8 text-white/80" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-3xl font-bold text-white">{notifications.length}</div>
+            </ModernCardContent>
+          </ModernCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Unread</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{unreadCount}</div>
-            </CardContent>
-          </Card>
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Unread</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Needs attention</p>
+                </div>
+                <BellRing className="h-8 w-8 text-red-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">{unreadCount}</div>
+            </ModernCardContent>
+          </ModernCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Payments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{notifications.filter((n) => n.type === "payment").length}</div>
-            </CardContent>
-          </Card>
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Today</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Recent activity</p>
+                </div>
+                <Clock className="h-8 w-8 text-blue-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">{todayCount}</div>
+            </ModernCardContent>
+          </ModernCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Reminders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{notifications.filter((n) => n.type === "reminder").length}</div>
-            </CardContent>
-          </Card>
+          <ModernCard>
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Payments</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Payment alerts</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-green-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {notifications.filter((n) => n.type === "payment").length}
+              </div>
+            </ModernCardContent>
+          </ModernCard>
         </div>
 
         {/* Notifications List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>All Notifications</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <ModernCard>
+          <ModernCardHeader>
+            <ModernCardTitle className="text-xl">All Notifications</ModernCardTitle>
+          </ModernCardHeader>
+          <ModernCardContent>
             {notifications.length === 0 ? (
-              <div className="text-center py-8">
-                <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No notifications yet</p>
+              <div className="text-center py-16">
+                <Bell className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No notifications yet</h3>
+                <p className="text-gray-500">You'll see important updates and alerts here</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {notifications.map((notification) => {
-                  const IconComponent = getTypeIcon(notification.type)
-                  return (
-                    <div
-                      key={notification._id}
-                      className={`border rounded-lg p-4 ${!notification.read ? "bg-blue-50 border-blue-200" : "bg-white"}`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <IconComponent className="h-5 w-5 text-gray-600 mt-0.5" />
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Badge className={getTypeColor(notification.type)}>{notification.type}</Badge>
-                              {!notification.read && <Badge variant="secondary">New</Badge>}
-                            </div>
-                            <p className="text-sm font-medium">{notification.message}</p>
-                            <p className="text-xs text-gray-500">{new Date(notification.createdAt).toLocaleString()}</p>
-                          </div>
-                        </div>
-                        {!notification.read && (
-                          <Button variant="outline" size="sm" onClick={() => markAsRead(notification._id)}>
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        )}
+                {notifications.map((notification) => (
+                  <div
+                    key={notification._id}
+                    className={`group relative rounded-xl border p-6 transition-all duration-200 ${
+                      !notification.read 
+                        ? "bg-blue-50 border-blue-200 shadow-sm" 
+                        : "bg-white border-gray-100 hover:border-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
+                        !notification.read ? "bg-blue-100" : "bg-gray-100"
+                      }`}>
+                        {getTypeIcon(notification.type)}
                       </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <ModernBadge variant={getTypeColor(notification.type)} className="capitalize">
+                            {notification.type}
+                          </ModernBadge>
+                          {!notification.read && (
+                            <ModernBadge variant="info" size="sm">
+                              New
+                            </ModernBadge>
+                          )}
+                        </div>
+                        
+                        <p className="text-gray-900 font-medium mb-2 leading-relaxed">
+                          {notification.message}
+                        </p>
+                        
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <Clock className="h-4 w-4" />
+                          <span>{new Date(notification.createdAt).toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {!notification.read && (
+                        <div className="flex-shrink-0">
+                          <ModernButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => markAsRead(notification._id)}
+                          >
+                            <Check className="h-4 w-4" />
+                            Mark Read
+                          </ModernButton>
+                        </div>
+                      )}
                     </div>
-                  )
-                })}
+
+                    {!notification.read && (
+                      <div className="absolute top-4 right-4 w-3 h-3 bg-blue-500 rounded-full"></div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </ModernCardContent>
+        </ModernCard>
       </div>
-    </MainLayout>
+    </ModernMainLayout>
   )
 }

@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { MainLayout } from "@/components/main-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModernMainLayout } from "@/components/modern-main-layout"
+import { ModernButton } from "@/components/ui/modern-button"
+import { ModernInput } from "@/components/ui/modern-input"
+import { ModernSelect } from "@/components/ui/modern-select"
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card"
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, FolderOpen, Users, Globe, DollarSign, Calendar, Save } from "lucide-react"
 import Link from "next/link"
 
 interface Platform {
@@ -15,13 +17,12 @@ interface Platform {
   name: string
 }
 
-export default function EditProjectPage() {
+export default function ModernEditProjectPage() {
   const params = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
   const [platforms, setPlatforms] = useState<Platform[]>([])
-
   const [formData, setFormData] = useState({
     name: "",
     clientName: "",
@@ -31,9 +32,10 @@ export default function EditProjectPage() {
     startDate: "",
     endDate: "",
     priceType: "fixed",
-    budget: "",      // Only for fixed price
-    hourlyRate: "",  // Only for hourly
+    budget: "",
+    hourlyRate: "",
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     apiClient.getPlatforms().then((data) => {
@@ -46,7 +48,6 @@ export default function EditProjectPage() {
     if (params.id) {
       fetchProject()
     }
-    // eslint-disable-next-line
   }, [params.id])
 
   const fetchProject = async () => {
@@ -70,20 +71,43 @@ export default function EditProjectPage() {
         startDate: project.startDate ? project.startDate.split("T")[0] : "",
         endDate: project.endDate ? project.endDate.split("T")[0] : "",
         priceType: project.priceType || "fixed",
-        budget: project.budget?.toString() || "",
+        budget: project.budget?.toString() || project.fixedPrice?.toString() || "",
         hourlyRate: project.hourlyRate?.toString() || "",
       })
     } catch (error) {
       console.error("Failed to fetch project:", error)
+      setErrors({ fetch: "Failed to load project details" })
     } finally {
       setFetchLoading(false)
     }
   }
 
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+    if (!formData.name.trim()) newErrors.name = "Project name is required"
+    if (!formData.clientName.trim()) newErrors.clientName = "Client name is required"
+    if (!formData.platform) newErrors.platform = "Please select a platform"
+    if (!formData.startDate) newErrors.startDate = "Start date is required"
+    
+    if (formData.priceType === "fixed") {
+      if (!formData.budget || Number(formData.budget) <= 0) {
+        newErrors.budget = "Budget must be greater than 0"
+      }
+    } else {
+      if (!formData.hourlyRate || Number(formData.hourlyRate) <= 0) {
+        newErrors.hourlyRate = "Hourly rate must be greater than 0"
+      }
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    if (!validateForm()) return
 
+    setLoading(true)
     try {
       const payload: any = {
         name: formData.name,
@@ -97,7 +121,7 @@ export default function EditProjectPage() {
       }
       if (formData.priceType === "fixed") {
         payload.budget = Number(formData.budget)
-        payload.fixedPrice = Number(formData.budget) // Backend expects both
+        payload.fixedPrice = Number(formData.budget)
         payload.hourlyRate = undefined
       } else {
         payload.hourlyRate = Number(formData.hourlyRate)
@@ -108,184 +132,239 @@ export default function EditProjectPage() {
       router.push(`/projects/${params.id}`)
     } catch (error) {
       console.error("Failed to update project:", error)
+      setErrors({ submit: "Failed to update project. Please try again." })
     } finally {
       setLoading(false)
     }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+    const { name, value } = e.target
+    setFormData({ ...formData, [name]: value })
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: "" })
+    }
   }
 
   if (fetchLoading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <ModernMainLayout>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="flex items-center gap-4">
+            <LoadingSkeleton width={100} height={40} />
+            <LoadingSkeleton width={300} height={40} />
+          </div>
+          <LoadingSkeleton variant="card" height={600} />
         </div>
-      </MainLayout>
+      </ModernMainLayout>
+    )
+  }
+
+  if (errors.fetch) {
+    return (
+      <ModernMainLayout>
+        <ModernCard>
+          <ModernCardContent className="py-16 text-center">
+            <div className="text-red-500 text-lg font-medium">Failed to load project</div>
+            <p className="text-gray-500 mt-2">Please try refreshing the page</p>
+          </ModernCardContent>
+        </ModernCard>
+      </ModernMainLayout>
     )
   }
 
   return (
-    <MainLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+    <ModernMainLayout>
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Header */}
         <div className="flex items-center gap-4">
           <Link href={`/projects/${params.id}`}>
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
+            <ModernButton variant="outline">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Project
+            </ModernButton>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Edit Project</h1>
-            <p className="text-gray-600">Update project details</p>
+            <h1 className="text-4xl font-bold text-gray-900">Edit Project</h1>
+            <p className="text-gray-600 text-lg">Update project details and configuration</p>
           </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Project Name *</label>
-                  <Input
+
+        <ModernCard>
+          <ModernCardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                <FolderOpen className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <ModernCardTitle className="text-2xl">Project Details</ModernCardTitle>
+                <p className="text-gray-600 mt-1">Update the information below to modify your project</p>
+              </div>
+            </div>
+          </ModernCardHeader>
+          
+          <ModernCardContent>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+                  {errors.submit}
+                </div>
+              )}
+
+              {/* Basic Information */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ModernInput
+                    label="Project Name"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    required
                     placeholder="Enter project name"
+                    icon={<FolderOpen className="h-4 w-4" />}
+                    error={errors.name}
                   />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Client Name *</label>
-                  <Input
+
+                  <ModernInput
+                    label="Client Name"
                     name="clientName"
                     value={formData.clientName}
                     onChange={handleChange}
-                    required
                     placeholder="Enter client name"
+                    icon={<Users className="h-4 w-4" />}
+                    error={errors.clientName}
                   />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Platform *</label>
-                  <select
+
+                  <ModernSelect
+                    label="Platform"
                     name="platform"
                     value={formData.platform}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Select Platform</option>
-                    {platforms.map((p) => (
-                      <option key={p._id} value={p._id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Currency *</label>
-                  <select
+                    options={[
+                      { value: "", label: "Select Platform" },
+                      ...platforms.map((p) => ({ value: p._id, label: p.name }))
+                    ]}
+                    error={errors.platform}
+                  />
+
+                  <ModernSelect
+                    label="Currency"
                     name="currency"
                     value={formData.currency}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="INR">INR</option>
-                  </select>
+                    options={[
+                      { value: "USD", label: "USD - US Dollar" },
+                      { value: "EUR", label: "EUR - Euro" },
+                      { value: "GBP", label: "GBP - British Pound" },
+                      { value: "INR", label: "INR - Indian Rupee" }
+                    ]}
+                  />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Status *</label>
-                  <select
+              </div>
+
+              {/* Project Configuration */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  Project Configuration
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ModernSelect
+                    label="Status"
                     name="status"
                     value={formData.status}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="completed">Completed</option>
-                    <option value="working">Working</option>
-                    <option value="extended">Extended</option>
-                    <option value="paused">Paused</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Price Type *</label>
-                  <select
+                    options={[
+                      { value: "pending", label: "Pending" },
+                      { value: "working", label: "Working" },
+                      { value: "completed", label: "Completed" },
+                      { value: "extended", label: "Extended" },
+                      { value: "paused", label: "Paused" }
+                    ]}
+                  />
+
+                  <ModernSelect
+                    label="Price Type"
                     name="priceType"
                     value={formData.priceType}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="fixed">Fixed Price</option>
-                    <option value="hourly">Hourly Rate</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Start Date *</label>
-                  <Input name="startDate" type="date" value={formData.startDate} onChange={handleChange} required />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">End Date </label>
-                  <Input name="endDate" type="date" value={formData.endDate} onChange={handleChange}  />
+                    options={[
+                      { value: "fixed", label: "Fixed Price" },
+                      { value: "hourly", label: "Hourly Rate" }
+                    ]}
+                  />
+
+                  <ModernInput
+                    label="Start Date"
+                    name="startDate"
+                    type="date"
+                    value={formData.startDate}
+                    onChange={handleChange}
+                    icon={<Calendar className="h-4 w-4" />}
+                    error={errors.startDate}
+                  />
+
+                  <ModernInput
+                    label="End Date"
+                    name="endDate"
+                    type="date"
+                    value={formData.endDate}
+                    onChange={handleChange}
+                    icon={<Calendar className="h-4 w-4" />}
+                  />
                 </div>
               </div>
-              {/* Show fields based on project type */}
-              {formData.priceType === "fixed" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Total Budget *</label>
-                  <Input
+
+              {/* Pricing */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  Pricing Details
+                </h3>
+                {formData.priceType === "fixed" ? (
+                  <ModernInput
+                    label="Total Budget"
                     name="budget"
                     type="number"
                     step="0.01"
                     value={formData.budget}
                     onChange={handleChange}
-                    required
                     placeholder="e.g., 10000"
+                    icon={<DollarSign className="h-4 w-4" />}
+                    error={errors.budget}
                   />
-                  <span className="text-xs text-gray-500">Total amount in selected currency</span>
-                </div>
-              )}
-              {formData.priceType === "hourly" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Hourly Rate *</label>
-                  <Input
+                ) : (
+                  <ModernInput
+                    label="Hourly Rate"
                     name="hourlyRate"
                     type="number"
                     step="0.01"
                     value={formData.hourlyRate}
                     onChange={handleChange}
-                    required
                     placeholder="Enter hourly rate"
+                    icon={<DollarSign className="h-4 w-4" />}
+                    error={errors.hourlyRate}
                   />
-                </div>
-              )}
-              <div className="flex gap-4 pt-4">
-                <Button type="submit" disabled={loading} className="flex-1">
-                  {loading ? "Updating..." : "Update Project"}
-                </Button>
+                )}
+              </div>
+
+              <div className="flex gap-4 pt-6">
+                <ModernButton type="submit" loading={loading} className="flex-1">
+                  <Save className="h-4 w-4" />
+                  Update Project
+                </ModernButton>
                 <Link href={`/projects/${params.id}`} className="flex-1">
-                  <Button type="button" variant="outline" className="w-full bg-transparent">
+                  <ModernButton type="button" variant="outline" className="w-full">
                     Cancel
-                  </Button>
+                  </ModernButton>
                 </Link>
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </ModernCardContent>
+        </ModernCard>
       </div>
-    </MainLayout>
+    </ModernMainLayout>
   )
 }
