@@ -39,6 +39,7 @@ app.use('/api/summary', summaryRoutes);
 app.use('/api/expense-reports', expenseReportsRoutes);
 app.use('/api/reports', require('./routes/report'));
 app.use('/api/leads', leadsRoutes);
+app.get('/health', (req, res) => res.status(200).send('api is healthy'));
 
 // Global error handler
 app.use((err, req, res, next) => {
