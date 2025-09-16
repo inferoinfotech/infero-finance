@@ -102,3 +102,38 @@ exports.adminDeleteUser = async (req, res, next) => {
     next(err);
   }
 };
+
+
+exports.adminListUsers = async (req, res, next) => {
+  try {
+    const { search = '', page = 1, limit = 20 } = req.query;
+    const q = search
+      ? { $or: [
+          { name:  { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { role:  { $regex: search, $options: 'i' } },
+        ] }
+      : {};
+
+    const skip = (Math.max(Number(page), 1) - 1) * Math.max(Number(limit), 1);
+    const [items, total] = await Promise.all([
+      User.find(q, { password: 0 }).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+      User.countDocuments(q),
+    ]);
+
+    res.json({ users: items, total, page: Number(page), limit: Number(limit) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.adminGetUser = async (req, res, next) => {
+  try {
+    const u = await User.findById(req.params.id, { password: 0 });
+    if (!u) return res.status(404).json({ error: 'User not found.' });
+    res.json({ user: u });
+  } catch (err) {
+    next(err);
+  }
+};
+

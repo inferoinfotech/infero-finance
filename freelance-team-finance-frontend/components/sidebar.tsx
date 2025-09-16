@@ -3,10 +3,10 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { LayoutDashboard, FolderOpen, Receipt, Wallet, Settings, History, Bell, FileText, LogOut } from "lucide-react"
+import { LayoutDashboard, FolderOpen, Receipt, Wallet, Settings, History, Bell, FileText, LogOut, UsersIcon } from "lucide-react"
 import type { Role } from "@/contexts/auth-context"
 
-const navigation = [
+const baseNav = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Leads", href: "/leads", icon: FileText },
   { name: "Projects", href: "/projects", icon: FolderOpen },
@@ -16,15 +16,16 @@ const navigation = [
   { name: "History", href: "/history", icon: History },
   { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Reports", href: "/reports", icon: FileText },
-]
+  { name: "Users", href: "/users", icon: UsersIcon },
+];
 
 function itemsForRole(role?: Role) {
-  if (!role) return []
-  if (role === "sales") return navigation.filter((n) => n.name === "Leads")
-  if (role === "developer") return navigation.filter((n) => n.name === "Reports")
-  // admin & owner get everything
-  if (role === "admin" || role === "owner") return navigation
-  return []
+  if (!role) return [];
+  if (role === "sales")      return baseNav.filter(n => n.name === "Leads");
+  if (role === "developer")  return baseNav.filter(n => n.name === "Reports");
+  if (role === "owner")      return baseNav.filter(n => n.name !== "Users");
+  if (role === "admin")      return baseNav; // admin gets everything
+  return [];
 }
 
 export function Sidebar() {

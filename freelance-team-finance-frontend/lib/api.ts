@@ -233,6 +233,27 @@ async getGeneralExpensesReport(groupBy: "month" | "day" = "month") {
   async addFollowUp(leadId: string, data: { date: string; clientResponse?: string; notes?: string; nextFollowUpDate?: string }) {
     return this.request(`/api/leads/${leadId}/follow-ups`, { method: "POST", body: JSON.stringify(data) })
   }
+
+  // ------- Users -------
+  async getUsers(params?: { search?: string; page?: number; limit?: number }) {
+    const qs = new URLSearchParams()
+    if (params?.search) qs.set('search', params.search)
+    if (params?.page)   qs.set('page', String(params.page))
+    if (params?.limit)  qs.set('limit', String(params.limit))
+    return this.request(`/api/auth/users${qs.toString() ? `?${qs}` : ''}`)
+  }
+
+  async createUser(payload: { name: string; email: string; password: string; role: 'admin'|'owner'|'sales'|'developer' }) {
+    return this.request('/api/auth/users', { method: 'POST', body: JSON.stringify(payload) })
+  }
+
+  async updateUser(id: string, payload: Partial<{ name: string; email: string; password: string; role: 'admin'|'owner'|'sales'|'developer' }>) {
+    return this.request(`/api/auth/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+  }
+
+  async deleteUser(id: string) {
+    return this.request(`/api/auth/users/${id}`, { method: 'DELETE' })
+  }
 }
 
 export const apiClient = new ApiClient()
