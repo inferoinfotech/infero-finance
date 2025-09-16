@@ -5,7 +5,7 @@ const auth = require('../middleware/auth');
 const { allow } = require('../middleware/roles');
 
 router.post('/', auth, allow('admin', 'owner'), platformController.createPlatform);
-router.get('/', auth, allow('admin', 'owner'), platformController.getPlatforms);
+router.get('/', auth, platformController.getPlatforms);
 router.put('/:platformId', auth, allow('admin', 'owner'), platformController.updatePlatform);
 router.delete('/:platformId', auth, allow('admin', 'owner'), platformController.deletePlatform);
 
