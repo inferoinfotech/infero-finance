@@ -7,6 +7,7 @@ import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from
 import { ModernBadge } from "@/components/ui/modern-badge"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
+import { formatDateTimeDDMMYYYY } from "@/lib/utils"
 import { 
   Bell, 
   Check, 
@@ -247,7 +248,7 @@ export default function ModernNotificationsPage() {
                         
                         <div className="flex items-center gap-1 text-sm text-gray-500">
                           <Clock className="h-4 w-4" />
-                          <span>{new Date(notification.createdAt).toLocaleString()}</span>
+                          <span>{formatDateTimeDDMMYYYY(notification.createdAt)}</span>
                         </div>
                       </div>
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/api";
+import { formatDateDDMMYYYY } from "@/lib/utils";
 import { X } from "lucide-react";
 
 interface Account {
@@ -472,7 +473,7 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                     >
                       {hourlyWorkOptions.map(entry => (
                         <option key={entry._id} value={entry._id}>
-                          {entry.weekStart ? new Date(entry.weekStart).toLocaleDateString() : ""}
+                          {formatDateDDMMYYYY(entry.weekStart, "")}
                           {" - "}
                           {entry.hours} hrs
                           {entry.user?.name ? ` (${entry.user.name})` : ""}

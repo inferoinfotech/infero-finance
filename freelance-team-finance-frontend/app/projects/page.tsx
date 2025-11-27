@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ModernMainLayout } from "@/components/modern-main-layout"
 import { ModernButton } from "@/components/ui/modern-button"
 import { ModernInput } from "@/components/ui/modern-input"
@@ -9,6 +9,7 @@ import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from
 import { ModernBadge } from "@/components/ui/modern-badge"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
+import { formatDateDDMMYYYY } from "@/lib/utils"
 import Link from "next/link"
 import { 
   Plus, 
@@ -18,10 +19,8 @@ import {
   Eye, 
   Calendar,
   DollarSign,
-  Clock,
   Users,
   Briefcase,
-  Filter,
   TrendingUp
 } from "lucide-react"
 
@@ -62,6 +61,7 @@ export default function ModernProjectsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [priceTypeFilter, setPriceTypeFilter] = useState("")
+  const [platformFilter, setPlatformFilter] = useState("")
 
   useEffect(() => {
     fetchProjects()
@@ -96,13 +96,32 @@ export default function ModernProjectsPage() {
     }
   }
 
+  const platformOptions = useMemo(() => {
+    const values = new Map<string, string>()
+    projects.forEach((project) => {
+      const platform = project.platform
+      if (typeof platform === "object" && platform?._id) {
+        values.set(platform._id, platform.name || "Unknown")
+      } else if (typeof platform === "string") {
+        values.set(platform, platform)
+      }
+    })
+    return Array.from(values.entries()).map(([value, label]) => ({ value, label }))
+  }, [projects])
+
   const filteredProjects = projects.filter((project) => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.clientName.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = !statusFilter || project.status === statusFilter
     const matchesPriceType = !priceTypeFilter || project.priceType === priceTypeFilter
-    return matchesSearch && matchesStatus && matchesPriceType
+    const platformValue =
+      typeof project.platform === "object" && project.platform?._id
+        ? project.platform._id
+        : project.platform
+    const matchesPlatform = !platformFilter || platformValue === platformFilter
+    return matchesSearch && matchesStatus && matchesPriceType && matchesPlatform
   })
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -234,8 +253,8 @@ export default function ModernProjectsPage() {
         {/* Filters */}
         <ModernCard>
           <ModernCardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="xl:col-span-2">
                 <ModernInput
                   placeholder="Search projects..."
                   value={searchTerm}
@@ -243,22 +262,27 @@ export default function ModernProjectsPage() {
                   icon={<Search className="h-4 w-4" />}
                 />
               </div>
-              <div className="lg:w-48">
-                <ModernSelect
-                  label="Status"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  options={statusOptions}
-                />
-              </div>
-              <div className="lg:w-48">
-                <ModernSelect
-                  label="Price Type"
-                  value={priceTypeFilter}
-                  onChange={(e) => setPriceTypeFilter(e.target.value)}
-                  options={priceTypeOptions}
-                />
-              </div>
+              <ModernSelect
+                label="Status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                options={statusOptions}
+              />
+              <ModernSelect
+                label="Price Type"
+                value={priceTypeFilter}
+                onChange={(e) => setPriceTypeFilter(e.target.value)}
+                options={priceTypeOptions}
+              />
+              <ModernSelect
+                label="Platform"
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All Platforms" },
+                  ...platformOptions,
+                ]}
+              />
             </div>
           </ModernCardContent>
         </ModernCard>
@@ -357,11 +381,11 @@ export default function ModernProjectsPage() {
                       Timeline
                     </p>
                     <div className="flex items-center justify-between text-gray-900">
-                      <span>{new Date(project.startDate).toLocaleDateString()}</span>
+                      <span>{formatDateDDMMYYYY(project.startDate)}</span>
                       <span className="text-gray-400">→</span>
                       <span>
                         {project.endDate 
-                          ? new Date(project.endDate).toLocaleDateString()
+                          ? formatDateDDMMYYYY(project.endDate)
                           : "Ongoing"
                         }
                       </span>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ModernMainLayout } from "@/components/modern-main-layout"
 import { ModernButton } from "@/components/ui/modern-button"
 import { ModernInput } from "@/components/ui/modern-input"
@@ -11,6 +11,7 @@ import { ModernTable, ModernTableBody, ModernTableCell, ModernTableHead, ModernT
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { apiClient } from "@/lib/api"
+import { formatDateDDMMYYYY } from "@/lib/utils"
 import { 
   Plus, 
   Search, 
@@ -53,6 +54,9 @@ export default function ModernExpensesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState("")
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [userFilter, setUserFilter] = useState("")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
   const [formData, setFormData] = useState({
     type: "general",
     name: "",
@@ -138,11 +142,23 @@ export default function ModernExpensesPage() {
     }
   }
 
+  const userOptions = useMemo(() => {
+    const names = new Set<string>()
+    expenses.forEach((expense) => {
+      if (expense.createdBy?.name) names.add(expense.createdBy.name)
+    })
+    return Array.from(names)
+  }, [expenses])
+
   const filteredExpenses = expenses.filter((expense) => {
     const matchesSearch = expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          expense.notes.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = !typeFilter || expense.type === typeFilter
-    return matchesSearch && matchesType
+    const matchesUser = !userFilter || expense.createdBy?.name === userFilter
+    const expenseDateValue = expense.date ? new Date(expense.date).getTime() : null
+    const matchesFrom = !dateFrom || (expenseDateValue !== null && expenseDateValue >= new Date(dateFrom).getTime())
+    const matchesTo = !dateTo || (expenseDateValue !== null && expenseDateValue <= new Date(dateTo).getTime())
+    return matchesSearch && matchesType && matchesUser && matchesFrom && matchesTo
   })
 
   const getTypeColor = (type: string) => {
@@ -258,8 +274,8 @@ export default function ModernExpensesPage() {
         {/* Filters */}
         <ModernCard>
           <ModernCardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+              <div className="xl:col-span-2">
                 <ModernInput
                   placeholder="Search expenses..."
                   value={searchTerm}
@@ -267,18 +283,39 @@ export default function ModernExpensesPage() {
                   icon={<Search className="h-4 w-4" />}
                 />
               </div>
-              <div className="lg:w-48">
-                <ModernSelect
-                  label="Filter by Type"
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  options={[
-                    { value: "", label: "All Types" },
-                    { value: "general", label: "General" },
-                    { value: "personal", label: "Personal" }
-                  ]}
-                />
-              </div>
+              <ModernSelect
+                label="Filter by Type"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "general", label: "General" },
+                  { value: "personal", label: "Personal" }
+                ]}
+              />
+              <ModernSelect
+                label="Filter by User"
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All Users" },
+                  ...userOptions.map(name => ({ value: name, label: name }))
+                ]}
+              />
+              <ModernInput
+                label="From Date"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                icon={<Calendar className="h-4 w-4" />}
+              />
+              <ModernInput
+                label="To Date"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                icon={<Calendar className="h-4 w-4" />}
+              />
             </div>
           </ModernCardContent>
         </ModernCard>
@@ -442,7 +479,7 @@ export default function ModernExpensesPage() {
                       </ModernTableCell>
                       <ModernTableCell>
                         <div className="text-sm">
-                          {new Date(expense.date).toLocaleDateString()}
+                          {formatDateDDMMYYYY(expense.date)}
                         </div>
                       </ModernTableCell>
                       <ModernTableCell>

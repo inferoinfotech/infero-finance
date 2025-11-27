@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { apiClient } from "@/lib/api"
+import { formatDateDDMMYYYY } from "@/lib/utils"
 import { Edit, Trash2, DollarSign, Clock } from "lucide-react"
 import { EditPaymentModal } from "./edit-payment-modal"
 
@@ -90,7 +91,7 @@ export function PaymentList({ payments, onPaymentUpdate }: PaymentListProps) {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="h-4 w-4" />
-                  <span>{new Date(payment.paymentDate).toLocaleDateString()}</span>
+                  <span>{formatDateDDMMYYYY(payment.paymentDate)}</span>
                 </div>
                 {payment.account && (
                   <div className="text-sm text-gray-600">

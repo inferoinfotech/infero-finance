@@ -11,6 +11,7 @@ import { ModernTable, ModernTableBody, ModernTableCell, ModernTableHead, ModernT
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { apiClient } from "@/lib/api"
+import { formatDateTimeDDMMYYYY } from "@/lib/utils"
 import { 
   Plus, 
   Edit, 
@@ -534,7 +535,7 @@ export default function ModernAccountsPage() {
                             <ModernTableRow key={txn._id}>
                               <ModernTableCell>
                                 <div className="text-sm">
-                                  {new Date(txn.createdAt).toLocaleString()}
+                                  {formatDateTimeDDMMYYYY(txn.createdAt)}
                                 </div>
                               </ModernTableCell>
                               <ModernTableCell>

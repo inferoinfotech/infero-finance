@@ -9,6 +9,7 @@ import { ModernBadge } from "@/components/ui/modern-badge"
 import { ModernTable, ModernTableBody, ModernTableCell, ModernTableHead, ModernTableHeader, ModernTableRow } from "@/components/ui/modern-table"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
+import { formatDateDDMMYYYY } from "@/lib/utils"
 import Link from "next/link"
 import { 
   ArrowLeft, 
@@ -293,7 +294,7 @@ export default function ModernProjectDetailPage() {
                   <span className="text-sm font-medium">Start Date</span>
                 </div>
                 <p className="text-gray-900 font-semibold">
-                  {project.startDate ? new Date(project.startDate).toLocaleDateString() : "—"}
+                  {formatDateDDMMYYYY(project.startDate)}
                 </p>
               </div>
 
@@ -303,7 +304,7 @@ export default function ModernProjectDetailPage() {
                   <span className="text-sm font-medium">End Date</span>
                 </div>
                 <p className="text-gray-900 font-semibold">
-                  {project.endDate ? new Date(project.endDate).toLocaleDateString() : "Ongoing"}
+                  {project.endDate ? formatDateDDMMYYYY(project.endDate) : "Ongoing"}
                 </p>
               </div>
 
@@ -390,7 +391,7 @@ export default function ModernProjectDetailPage() {
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-gray-400" />
                             <span>
-                              {log.weekStart ? new Date(log.weekStart).toLocaleDateString() : "—"}
+                              {formatDateDDMMYYYY(log.weekStart)}
                             </span>
                           </div>
                         </ModernTableCell>

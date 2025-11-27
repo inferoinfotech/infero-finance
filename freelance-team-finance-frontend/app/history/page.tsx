@@ -8,6 +8,7 @@ import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from
 import { ModernBadge } from "@/components/ui/modern-badge"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
+import { formatDateTimeDDMMYYYY } from "@/lib/utils"
 import { 
   Search, 
   Clock, 
@@ -260,7 +261,7 @@ export default function ModernHistoryPage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            <span>{new Date(entry.timestamp).toLocaleString()}</span>
+                            <span>{formatDateTimeDDMMYYYY(entry.timestamp)}</span>
                           </div>
                         </div>
 

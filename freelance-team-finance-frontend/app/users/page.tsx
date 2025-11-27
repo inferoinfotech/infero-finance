@@ -13,6 +13,7 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus, Edit, Trash2, Search, ShieldCheck, User as UserIcon, Mail } from "lucide-react"
 import { apiClient } from "@/lib/api"
+import { formatDateDDMMYYYY } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 
 type Role = "admin" | "owner" | "sales" | "developer"
@@ -156,7 +157,7 @@ export default function UsersPage() {
                       </ModernTableCell>
                       <ModernTableCell>
                         <span className="text-gray-600">
-                          {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
+                          {formatDateDDMMYYYY(u.createdAt)}
                         </span>
                       </ModernTableCell>
                       <ModernTableCell className="text-right">

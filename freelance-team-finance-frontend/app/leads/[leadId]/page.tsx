@@ -10,6 +10,7 @@ import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from
 import { ModernBadge } from "@/components/ui/modern-badge"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
+import { formatDateTimeDDMMYYYY } from "@/lib/utils"
 import type { Lead, FollowUp } from "@/types/lead"
 import Link from "next/link"
 import { 
@@ -521,12 +522,12 @@ export default function ModernLeadDetailPage() {
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Clock className="h-4 w-4 text-gray-400" />
-                                  <span className="text-sm text-gray-600">
-                                    {new Date(f.date).toLocaleString()}
-                                  </span>
-                                </div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Clock className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-600">
+                              {formatDateTimeDDMMYYYY(f.date)}
+                            </span>
+                          </div>
                                 {f.clientResponse && (
                                   <div className="font-medium text-gray-900 mb-1">
                                     "{f.clientResponse}"

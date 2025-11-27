@@ -11,6 +11,7 @@ import { ModernTable, ModernTableBody, ModernTableCell, ModernTableHead, ModernT
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { apiClient } from "@/lib/api"
+import { formatDateDDMMYYYY } from "@/lib/utils"
 import type { Lead } from "@/types/lead"
 import { useAuth } from "@/contexts/auth-context"
 import Link from "next/link"
@@ -153,15 +154,6 @@ export default function ModernLeadsPage() {
       return true
     })
   }, [items, statusFilter])
-
-  const formatDisplayDate = (value?: string) => {
-    if (!value) return "—"
-    return new Date(value).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -499,12 +491,12 @@ export default function ModernLeadsPage() {
                       </ModernTableCell>
                       <ModernTableCell>
                         <div className="text-sm">
-                      {formatDisplayDate(lead.nextFollowUpDate)}
+                          {formatDateDDMMYYYY(lead.nextFollowUpDate)}
                         </div>
                       </ModernTableCell>
                       <ModernTableCell>
                         <div className="text-sm text-gray-500">
-                      {formatDisplayDate(lead.updatedAt)}
+                          {formatDateDDMMYYYY(lead.updatedAt)}
                         </div>
                       </ModernTableCell>
                       <ModernTableCell className="text-right">
