@@ -120,3 +120,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .gradient-primary {
+    @apply bg-gradient-to-br from-[#4f46e5] via-[#7c3aed] to-[#a855f7] text-white shadow-lg;
+    position: relative;
+  }
+  .gradient-primary::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), transparent);
+    pointer-events: none;
+  }
+  .gradient-primary > * {
+    position: relative;
+    z-index: 1;
+  }
+}
