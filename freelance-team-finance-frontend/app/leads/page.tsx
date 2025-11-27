@@ -53,6 +53,8 @@ export default function ModernLeadsPage() {
   const [platform, setPlatform] = useState("")
   const [nextFrom, setNextFrom] = useState("")
   const [nextTo, setNextTo] = useState("")
+  const [followUpPreset, setFollowUpPreset] = useState<"all" | "today" | "tomorrow" | "yesterday" | "custom">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "lost">("all")
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false)
@@ -104,11 +106,62 @@ export default function ModernLeadsPage() {
 
   useEffect(() => { fetchLeads({ page:1 }) }, [canQuery])
 
+  const setDateRangeFromPreset = (preset: "all" | "today" | "tomorrow" | "yesterday" | "custom") => {
+    if (preset === "all") {
+      setNextFrom("")
+      setNextTo("")
+      return
+    }
+    if (preset === "custom") return
+    const base = new Date()
+    if (preset === "tomorrow") base.setDate(base.getDate() + 1)
+    if (preset === "yesterday") base.setDate(base.getDate() - 1)
+    const start = new Date(base)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(base)
+    end.setHours(23, 59, 59, 999)
+    setNextFrom(start.toISOString())
+    setNextTo(end.toISOString())
+  }
+
+  const handleFollowUpPresetChange = (preset: "all" | "today" | "tomorrow" | "yesterday" | "custom") => {
+    setFollowUpPreset(preset)
+    setDateRangeFromPreset(preset)
+  }
+
   const clearFilters = () => {
-    setQ(""); setStage(""); setPriority(""); setPlatform(""); setNextFrom(""); setNextTo("")
+    setQ("")
+    setStage("")
+    setPriority("")
+    setPlatform("")
+    setFollowUpPreset("all")
+    setStatusFilter("all")
+    setDateRangeFromPreset("all")
   }
 
   const totalPages = Math.max(1, Math.ceil(total / limit))
+
+  const filteredAndSortedItems = useMemo(() => {
+    const sorted = [...items].sort((a, b) => {
+      const aTime = a.nextFollowUpDate ? new Date(a.nextFollowUpDate).getTime() : 0
+      const bTime = b.nextFollowUpDate ? new Date(b.nextFollowUpDate).getTime() : 0
+      return aTime - bTime
+    })
+    return sorted.filter((lead) => {
+      if (statusFilter === "lost") return lead.stage === "Lost"
+      if (statusFilter === "active") return lead.stage !== "Lost"
+      return true
+    })
+  }, [items, statusFilter])
+
+  const formatDisplayDate = (value?: string) => {
+    if (!value) return "—"
+    return new Date(value).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -275,7 +328,7 @@ export default function ModernLeadsPage() {
         {/* Filters */}
         <ModernCard>
           <ModernCardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
               <div className="lg:col-span-2">
                 <ModernInput
                   placeholder="Search client, notes, tags..."
@@ -291,6 +344,18 @@ export default function ModernLeadsPage() {
                 options={[
                   { value: "", label: "All Stages" },
                   ...STAGES.map(s => ({ value: s, label: s }))
+                ]}
+              />
+              <ModernSelect
+                label="Follow-up"
+                value={followUpPreset}
+                onChange={(e) => handleFollowUpPresetChange(e.target.value as "all" | "today" | "tomorrow" | "yesterday" | "custom")}
+                options={[
+                  { value: "all", label: "All Dates" },
+                  { value: "today", label: "Today" },
+                  { value: "tomorrow", label: "Tomorrow" },
+                  { value: "yesterday", label: "Yesterday" },
+                  { value: "custom", label: "Custom Range" },
                 ]}
               />
               <ModernSelect
@@ -311,6 +376,34 @@ export default function ModernLeadsPage() {
                   ...platforms.map(p => ({ value: p._id, label: p.name }))
                 ]}
               />
+              <ModernSelect
+                label="Status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "lost")}
+                options={[
+                  { value: "all", label: "All Leads" },
+                  { value: "active", label: "Active Leads" },
+                  { value: "lost", label: "Lost Leads" },
+                ]}
+              />
+              {followUpPreset === "custom" && (
+                <div className="flex flex-col gap-3 lg:col-span-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <ModernInput
+                      label="From"
+                      type="date"
+                      value={nextFrom ? new Date(nextFrom).toISOString().slice(0, 10) : ""}
+                      onChange={(e) => setNextFrom(e.target.value ? new Date(`${e.target.value}T00:00:00`).toISOString() : "")}
+                    />
+                    <ModernInput
+                      label="To"
+                      type="date"
+                      value={nextTo ? new Date(nextTo).toISOString().slice(0, 10) : ""}
+                      onChange={(e) => setNextTo(e.target.value ? new Date(`${e.target.value}T23:59:59`).toISOString() : "")}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <ModernButton onClick={() => fetchLeads({ page: 1 })} disabled={busy}>
                   <Filter className="h-4 w-4" />
@@ -332,7 +425,7 @@ export default function ModernLeadsPage() {
               <ModernCardTitle className="text-xl">All Leads</ModernCardTitle>
               <div className="flex items-center gap-4">
                 <ModernBadge variant="secondary">
-                  {items.length} of {total}
+                  {filteredAndSortedItems.length} of {total}
                 </ModernBadge>
                 <ModernButton variant="outline" onClick={() => fetchLeads()} disabled={busy}>
                   <RefreshCcw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
@@ -342,7 +435,7 @@ export default function ModernLeadsPage() {
             </div>
           </ModernCardHeader>
           <ModernCardContent className="p-0">
-            {items.length === 0 ? (
+            {filteredAndSortedItems.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500 text-lg">
@@ -367,7 +460,7 @@ export default function ModernLeadsPage() {
                   </ModernTableRow>
                 </ModernTableHeader>
                 <ModernTableBody>
-                  {items.map((lead) => (
+                  {filteredAndSortedItems.map((lead) => (
                     <ModernTableRow key={lead._id}>
                       <ModernTableCell>
                         <div className="flex items-center gap-3">
@@ -406,18 +499,12 @@ export default function ModernLeadsPage() {
                       </ModernTableCell>
                       <ModernTableCell>
                         <div className="text-sm">
-                          {lead.nextFollowUpDate 
-                            ? new Date(lead.nextFollowUpDate).toLocaleDateString()
-                            : "—"
-                          }
+                      {formatDisplayDate(lead.nextFollowUpDate)}
                         </div>
                       </ModernTableCell>
                       <ModernTableCell>
                         <div className="text-sm text-gray-500">
-                          {lead.updatedAt 
-                            ? new Date(lead.updatedAt).toLocaleDateString()
-                            : "—"
-                          }
+                      {formatDisplayDate(lead.updatedAt)}
                         </div>
                       </ModernTableCell>
                       <ModernTableCell className="text-right">

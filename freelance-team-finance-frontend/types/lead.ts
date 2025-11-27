@@ -8,9 +8,11 @@ export type Address = {
 }
 
 export type FollowUp = {
+  _id?: string
   date: string
   clientResponse?: string
   notes?: string
+  nextFollowUpDate?: string
   addedBy?: { _id: string; name: string; email: string } | string
 }
 

@@ -14,5 +14,7 @@ router.delete('/:leadId', auth, allow('admin', 'owner', 'sales'), leadController
 
 // Follow-ups
 router.post('/:leadId/follow-ups', auth, allow('admin', 'owner', 'sales'), leadController.addFollowUp);
+router.put('/:leadId/follow-ups/:followUpId', auth, allow('admin', 'owner', 'sales'), leadController.updateFollowUp);
+router.delete('/:leadId/follow-ups/:followUpId', auth, allow('admin', 'owner', 'sales'), leadController.deleteFollowUp);
 
 module.exports = router;

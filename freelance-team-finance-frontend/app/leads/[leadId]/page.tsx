@@ -10,12 +10,13 @@ import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from
 import { ModernBadge } from "@/components/ui/modern-badge"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
-import type { Lead } from "@/types/lead"
+import type { Lead, FollowUp } from "@/types/lead"
 import Link from "next/link"
 import { 
   Save, 
   ChevronLeft, 
   Trash2, 
+  Edit3,
   Plus, 
   Users, 
   Building2, 
@@ -32,6 +33,7 @@ import {
 
 const STAGES = ["New","Contacted","In Discussion","Proposal Sent","Negotiation","Won","Lost","On Hold","No Reply"]
 const PRIORITIES = ["High","Medium","Low"]
+const formatDateTimeLocal = (value?: string | null) => value ? new Date(value).toISOString().slice(0,16) : ""
 
 export default function ModernLeadDetailPage() {
   const { leadId } = useParams<{ leadId: string }>()
@@ -45,6 +47,7 @@ export default function ModernLeadDetailPage() {
   // follow-up form
   const [fu, setFu] = useState({ date: "", clientResponse: "", notes: "", nextFollowUpDate: "" })
   const [fuErrors, setFuErrors] = useState<Record<string, string>>({})
+  const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null)
 
   const fetchLead = async () => {
     try {
@@ -127,24 +130,78 @@ export default function ModernLeadDetailPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const addFollowUp = async () => {
+  const resetFollowUpForm = () => {
+    setFu({ date:"", clientResponse:"", notes:"", nextFollowUpDate:"" })
+    setFuErrors({})
+    setEditingFollowUpId(null)
+  }
+
+  const handleEditFollowUp = (followUp: FollowUp) => {
+    if (!followUp._id) {
+      setFuErrors({ submit: "Unable to edit this follow-up. Missing identifier." })
+      return
+    }
+    setEditingFollowUpId(followUp._id)
+    setFu({
+      date: formatDateTimeLocal(followUp.date),
+      clientResponse: followUp.clientResponse || "",
+      notes: followUp.notes || "",
+      nextFollowUpDate: formatDateTimeLocal(followUp.nextFollowUpDate || ""),
+    })
+    setFuErrors({})
+  }
+
+  const submitFollowUp = async () => {
     if (!validateFollowUp()) return
     
     try {
       setBusy(true)
-      await apiClient.addFollowUp(leadId, {
+      const basePayload = {
         date: new Date(fu.date).toISOString(),
         clientResponse: fu.clientResponse,
         notes: fu.notes,
-        nextFollowUpDate: fu.nextFollowUpDate ? new Date(fu.nextFollowUpDate).toISOString() : undefined
-      })
-      setFu({ date:"", clientResponse:"", notes:"", nextFollowUpDate:"" })
-      setFuErrors({})
+      }
+      const nextFollowUpValue = fu.nextFollowUpDate
+        ? new Date(fu.nextFollowUpDate).toISOString()
+        : editingFollowUpId ? null : undefined
+
+      if (editingFollowUpId) {
+        await apiClient.updateFollowUp(leadId, editingFollowUpId, {
+          ...basePayload,
+          ...(nextFollowUpValue !== undefined ? { nextFollowUpDate: nextFollowUpValue } : {}),
+        })
+      } else {
+        await apiClient.addFollowUp(leadId, {
+          ...basePayload,
+          ...(typeof nextFollowUpValue === "string" ? { nextFollowUpDate: nextFollowUpValue } : {}),
+        })
+      }
+      resetFollowUpForm()
       await fetchLead()
     } catch (e:any) { 
-      setFuErrors({ submit: e?.message || "Failed to add follow-up" })
+      setFuErrors({ submit: e?.message || `Failed to ${editingFollowUpId ? "update" : "add"} follow-up` })
     } finally { 
       setBusy(false) 
+    }
+  }
+
+  const handleDeleteFollowUp = async (followUpId?: string) => {
+    if (!followUpId) {
+      setFuErrors({ submit: "Unable to delete this follow-up. Missing identifier." })
+      return
+    }
+    if (!confirm("Delete this follow-up?")) return
+    try {
+      setBusy(true)
+      await apiClient.deleteFollowUp(leadId, followUpId)
+      if (editingFollowUpId === followUpId) {
+        resetFollowUpForm()
+      }
+      await fetchLead()
+    } catch (e:any) {
+      setFuErrors({ submit: e?.message || "Failed to delete follow-up" })
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -376,12 +433,24 @@ export default function ModernLeadDetailPage() {
           <div className="space-y-6">
             <ModernCard>
               <ModernCardHeader>
-                <ModernCardTitle>Add Follow-up</ModernCardTitle>
+                <ModernCardTitle>{editingFollowUpId ? "Edit Follow-up" : "Add Follow-up"}</ModernCardTitle>
               </ModernCardHeader>
               <ModernCardContent className="space-y-4">
                 {fuErrors.submit && (
                   <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
                     {fuErrors.submit}
+                  </div>
+                )}
+                {editingFollowUpId && (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-600 px-4 py-3 rounded-xl text-sm flex items-center justify-between gap-2">
+                    <span>Updating an existing follow-up</span>
+                    <button
+                      type="button"
+                      className="text-blue-700 text-xs font-semibold"
+                      onClick={resetFollowUpForm}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 )}
 
@@ -417,9 +486,9 @@ export default function ModernLeadDetailPage() {
                   icon={<Calendar className="h-4 w-4" />}
                 />
 
-                <ModernButton onClick={addFollowUp} loading={busy} className="w-full">
-                  <Plus className="h-4 w-4" />
-                  Add Follow-up
+                <ModernButton onClick={submitFollowUp} loading={busy} className="w-full">
+                  {editingFollowUpId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                  {editingFollowUpId ? "Update Follow-up" : "Add Follow-up"}
                 </ModernButton>
               </ModernCardContent>
             </ModernCard>
@@ -437,30 +506,67 @@ export default function ModernLeadDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {(lead?.followUps || []).slice().reverse().map((f, idx) => (
-                      <div key={idx} className="border-l-4 border-blue-200 pl-4 pb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">
-                            {new Date(f.date).toLocaleString()}
-                          </span>
-                        </div>
-                        {f.clientResponse && (
-                          <div className="font-medium text-gray-900 mb-1">
-                            "{f.clientResponse}"
+                    {(() => {
+                      const followUps = lead?.followUps || []
+                      return followUps.slice().reverse().map((f, idx) => {
+                        const originalIndex = followUps.length - 1 - idx
+                        const followUpIdentifier = f._id || String(originalIndex)
+                        const isEditingThis = editingFollowUpId === f._id
+                        return (
+                          <div
+                            key={followUpIdentifier}
+                            className={`border-l-4 pl-4 pb-4 rounded-lg transition-colors ${
+                              isEditingThis ? "border-blue-500 bg-blue-50/40" : "border-blue-200"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Clock className="h-4 w-4 text-gray-400" />
+                                  <span className="text-sm text-gray-600">
+                                    {new Date(f.date).toLocaleString()}
+                                  </span>
+                                </div>
+                                {f.clientResponse && (
+                                  <div className="font-medium text-gray-900 mb-1">
+                                    "{f.clientResponse}"
+                                  </div>
+                                )}
+                                {f.notes && (
+                                  <div className="text-gray-600 text-sm mb-2">{f.notes}</div>
+                                )}
+                                {typeof f.addedBy === "object" && f.addedBy && (
+                                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                                    <User className="h-3 w-3" />
+                                    by {(f.addedBy as any).name}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex flex-col sm:flex-row gap-1 text-xs whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditFollowUp(f)}
+                                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-blue-600 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  disabled={!f._id}
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteFollowUp(f._id)}
+                                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-red-600 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  disabled={!f._id}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                        {f.notes && (
-                          <div className="text-gray-600 text-sm mb-2">{f.notes}</div>
-                        )}
-                        {typeof f.addedBy === "object" && f.addedBy && (
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <User className="h-3 w-3" />
-                            by {(f.addedBy as any).name}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                        )
+                      })
+                    })()}
                   </div>
                 )}
               </ModernCardContent>

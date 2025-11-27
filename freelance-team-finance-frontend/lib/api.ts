@@ -233,6 +233,12 @@ async getGeneralExpensesReport(groupBy: "month" | "day" = "month") {
   async addFollowUp(leadId: string, data: { date: string; clientResponse?: string; notes?: string; nextFollowUpDate?: string }) {
     return this.request(`/api/leads/${leadId}/follow-ups`, { method: "POST", body: JSON.stringify(data) })
   }
+  async updateFollowUp(leadId: string, followUpId: string, data: { date?: string; clientResponse?: string; notes?: string; nextFollowUpDate?: string | null }) {
+    return this.request(`/api/leads/${leadId}/follow-ups/${followUpId}`, { method: "PUT", body: JSON.stringify(data) })
+  }
+  async deleteFollowUp(leadId: string, followUpId: string) {
+    return this.request(`/api/leads/${leadId}/follow-ups/${followUpId}`, { method: "DELETE" })
+  }
 
   // ------- Users -------
   async getUsers(params?: { search?: string; page?: number; limit?: number }) {

@@ -1,15 +1,12 @@
 // models/Lead.js
 const mongoose = require('mongoose');
 
-const followUpSchema = new mongoose.Schema(
-  {
-    date:            { type: Date, required: true },
-    clientResponse:  { type: String, default: '' }, // e.g., "asked for quote", "no reply", "interested"
-    notes:           { type: String, default: '' },
-    addedBy:         { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // who logged this follow-up
-  },
-  { _id: false }
-);
+const followUpSchema = new mongoose.Schema({
+  date:            { type: Date, required: true },
+  clientResponse:  { type: String, default: '' }, // e.g., "asked for quote", "no reply", "interested"
+  notes:           { type: String, default: '' },
+  addedBy:         { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // who logged this follow-up
+});
 
 const addressSchema = new mongoose.Schema(
   {
