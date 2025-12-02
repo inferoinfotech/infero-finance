@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback, useRef } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef, Suspense } from "react"
 import { ModernMainLayout } from "@/components/modern-main-layout"
 import { ModernButton } from "@/components/ui/modern-button"
 import { ModernInput } from "@/components/ui/modern-input"
@@ -37,7 +37,7 @@ import {
 const STAGES = ["New","Contacted","In Discussion","Proposal Sent","Negotiation","Won","Lost","On Hold","No Reply"]
 const PRIORITIES = ["High","Medium","Low"]
 
-export default function ModernLeadsPage() {
+function LeadsPageContent() {
   const { token, loading } = useAuth()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -772,5 +772,28 @@ export default function ModernLeadsPage() {
         </Dialog>
       </div>
     </ModernMainLayout>
+  )
+}
+
+export default function ModernLeadsPage() {
+  return (
+    <Suspense fallback={
+      <ModernMainLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <LoadingSkeleton width={300} height={40} />
+            <LoadingSkeleton width={120} height={40} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <LoadingSkeleton key={i} variant="card" />
+            ))}
+          </div>
+          <LoadingSkeleton variant="card" height={400} />
+        </div>
+      </ModernMainLayout>
+    }>
+      <LeadsPageContent />
+    </Suspense>
   )
 }
