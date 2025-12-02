@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import { ModernMainLayout } from "@/components/modern-main-layout"
 import { ModernButton } from "@/components/ui/modern-button"
 import { ModernInput } from "@/components/ui/modern-input"
@@ -15,10 +15,10 @@ import { formatDateDDMMYYYY } from "@/lib/utils"
 import type { Lead } from "@/types/lead"
 import { useAuth } from "@/contexts/auth-context"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
 import { 
   Plus, 
   Search, 
-  Filter, 
   RefreshCcw, 
   X, 
   Users, 
@@ -39,6 +39,8 @@ const PRIORITIES = ["High","Medium","Low"]
 
 export default function ModernLeadsPage() {
   const { token, loading } = useAuth()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [items, setItems] = useState<Lead[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -47,15 +49,19 @@ export default function ModernLeadsPage() {
 
   const [platforms, setPlatforms] = useState<{_id:string; name:string}[]>([])
 
-  // Filters
-  const [q, setQ] = useState("")
-  const [stage, setStage] = useState("")
-  const [priority, setPriority] = useState("")
-  const [platform, setPlatform] = useState("")
-  const [nextFrom, setNextFrom] = useState("")
-  const [nextTo, setNextTo] = useState("")
-  const [followUpPreset, setFollowUpPreset] = useState<"all" | "today" | "tomorrow" | "yesterday" | "custom">("all")
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "lost">("all")
+  // Initialize filters from URL params
+  const [q, setQ] = useState(searchParams.get("q") || "")
+  const [stage, setStage] = useState(searchParams.get("stage") || "")
+  const [priority, setPriority] = useState(searchParams.get("priority") || "")
+  const [platform, setPlatform] = useState(searchParams.get("platform") || "")
+  const [nextFrom, setNextFrom] = useState(searchParams.get("nextFrom") || "")
+  const [nextTo, setNextTo] = useState(searchParams.get("nextTo") || "")
+  const [followUpPreset, setFollowUpPreset] = useState<"all" | "today" | "tomorrow" | "yesterday" | "custom">(
+    (searchParams.get("followUpPreset") as "all" | "today" | "tomorrow" | "yesterday" | "custom") || "all"
+  )
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "lost">(
+    (searchParams.get("statusFilter") as "all" | "active" | "lost") || "all"
+  )
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false)
@@ -77,6 +83,21 @@ export default function ModernLeadsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const canQuery = useMemo(() => !!token && !loading, [token, loading])
+  const isInitialMount = useRef(true)
+
+  // Update URL params when filters change
+  const updateURLParams = useCallback((updates: Record<string, string>) => {
+    if (isInitialMount.current) return // Don't update URL on initial mount
+    const params = new URLSearchParams(searchParams.toString())
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value && value !== "") {
+        params.set(key, value)
+      } else {
+        params.delete(key)
+      }
+    })
+    router.replace(`/leads?${params.toString()}`, { scroll: false })
+  }, [searchParams, router])
 
   useEffect(() => {
     (async () => {
@@ -87,13 +108,52 @@ export default function ModernLeadsPage() {
     })()
   }, [])
 
-  const fetchLeads = async (opts?: Partial<{ page:number; limit:number }>) => {
+  // Restore date ranges from URL on mount
+  useEffect(() => {
+    // If URL has custom dates, ensure preset is set to custom
+    if (nextFrom || nextTo) {
+      if (followUpPreset !== "custom") {
+        setFollowUpPreset("custom")
+      }
+    } else if (followUpPreset && followUpPreset !== "all" && followUpPreset !== "custom") {
+      // Restore preset-based date ranges
+      setDateRangeFromPreset(followUpPreset)
+    }
+    // Mark initial mount as complete after first render
+    isInitialMount.current = false
+  }, []) // Only run on mount
+
+  // Auto-apply filters when they change (debounced for search)
+  const [debouncedQ, setDebouncedQ] = useState(q)
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQ(q)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [q])
+
+  // Update URL when filters change (including debounced search)
+  useEffect(() => {
+    updateURLParams({ 
+      q: debouncedQ, 
+      stage, 
+      priority, 
+      platform, 
+      nextFrom, 
+      nextTo, 
+      followUpPreset, 
+      statusFilter 
+    })
+  }, [debouncedQ, stage, priority, platform, nextFrom, nextTo, followUpPreset, statusFilter, updateURLParams])
+
+  const fetchLeads = useCallback(async (opts?: Partial<{ page:number; limit:number }>) => {
     if (!canQuery) return
     const p = opts?.page ?? page
     const l = opts?.limit ?? limit
     setBusy(true)
     try {
-      const data = await apiClient.getLeads({ q, stage, priority, platform, nextFrom, nextTo, page: p, limit: l })
+      const data = await apiClient.getLeads({ q: debouncedQ, stage, priority, platform, nextFrom, nextTo, page: p, limit: l })
       setItems(data.items || [])
       setTotal(data.total || 0)
       setPage(data.page || p)
@@ -103,9 +163,14 @@ export default function ModernLeadsPage() {
     } finally {
       setBusy(false)
     }
-  }
+  }, [canQuery, debouncedQ, stage, priority, platform, nextFrom, nextTo, page, limit])
 
-  useEffect(() => { fetchLeads({ page:1 }) }, [canQuery])
+  // Initial load and auto-apply filters when they change
+  useEffect(() => {
+    if (canQuery) {
+      fetchLeads({ page: 1 })
+    }
+  }, [canQuery, debouncedQ, stage, priority, platform, nextFrom, nextTo, fetchLeads])
 
   const setDateRangeFromPreset = (preset: "all" | "today" | "tomorrow" | "yesterday" | "custom") => {
     if (preset === "all") {
@@ -132,12 +197,14 @@ export default function ModernLeadsPage() {
 
   const clearFilters = () => {
     setQ("")
+    setDebouncedQ("")
     setStage("")
     setPriority("")
     setPlatform("")
     setFollowUpPreset("all")
     setStatusFilter("all")
     setDateRangeFromPreset("all")
+    router.replace("/leads", { scroll: false })
   }
 
   const totalPages = Math.max(1, Math.ceil(total / limit))
@@ -397,10 +464,6 @@ export default function ModernLeadsPage() {
                 </div>
               )}
               <div className="flex gap-2">
-                <ModernButton onClick={() => fetchLeads({ page: 1 })} disabled={busy}>
-                  <Filter className="h-4 w-4" />
-                  Apply
-                </ModernButton>
                 <ModernButton variant="outline" onClick={clearFilters}>
                   <X className="h-4 w-4" />
                   Clear
@@ -500,7 +563,14 @@ export default function ModernLeadsPage() {
                         </div>
                       </ModernTableCell>
                       <ModernTableCell className="text-right">
-                        <Link href={`/leads/${lead._id}`}>
+                        <Link 
+                          href={`/leads/${lead._id}`}
+                          onClick={() => {
+                            // Store current URL with filters for back navigation
+                            const currentUrl = window.location.pathname + window.location.search
+                            sessionStorage.setItem('leadsPageUrl', currentUrl)
+                          }}
+                        >
                           <ModernButton variant="outline" size="sm">
                             <Eye className="h-4 w-4" />
                             Open

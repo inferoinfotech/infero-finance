@@ -12,7 +12,6 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
 import { formatDateTimeDDMMYYYY } from "@/lib/utils"
 import type { Lead, FollowUp } from "@/types/lead"
-import Link from "next/link"
 import { 
   Save, 
   ChevronLeft, 
@@ -44,6 +43,7 @@ export default function ModernLeadDetailPage() {
   const [busy, setBusy] = useState(false)
   const [edit, setEdit] = useState<any>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [backUrl, setBackUrl] = useState<string | null>(null)
 
   // follow-up form
   const [fu, setFu] = useState({ date: "", clientResponse: "", notes: "", nextFollowUpDate: "" })
@@ -76,6 +76,18 @@ export default function ModernLeadDetailPage() {
   }
 
   useEffect(() => {
+    // Store the referrer URL (from leads page with filters) for back navigation
+    const referrer = document.referrer
+    if (referrer && referrer.includes('/leads')) {
+      setBackUrl(referrer)
+    } else {
+      // Fallback: try to get from sessionStorage (set by leads page)
+      const storedUrl = sessionStorage.getItem('leadsPageUrl')
+      if (storedUrl) {
+        setBackUrl(storedUrl)
+      }
+    }
+    
     (async () => {
       try { 
         const { platforms } = await apiClient.getPlatforms()
@@ -84,6 +96,14 @@ export default function ModernLeadDetailPage() {
       fetchLead()
     })()
   }, [leadId])
+
+  const handleBack = () => {
+    if (backUrl) {
+      router.push(backUrl)
+    } else {
+      router.back()
+    }
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -261,12 +281,10 @@ export default function ModernLeadDetailPage() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Link href="/leads">
-              <ModernButton variant="outline">
-                <ChevronLeft className="h-4 w-4" />
-                Back to Leads
-              </ModernButton>
-            </Link>
+            <ModernButton variant="outline" onClick={handleBack}>
+              <ChevronLeft className="h-4 w-4" />
+              Back to Leads
+            </ModernButton>
             <div>
               <h1 className="text-4xl font-bold text-gray-900">{lead?.clientName}</h1>
               <div className="flex items-center gap-2 mt-2">
