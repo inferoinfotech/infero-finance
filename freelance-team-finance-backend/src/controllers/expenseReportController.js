@@ -7,11 +7,16 @@ const mongoose = require('mongoose');
 // CSV Export
 exports.exportExpensesCSV = async (req, res, next) => {
   try {
-    const expenses = await Expense.find().populate('withdrawAccount', 'name').populate('createdBy', 'name email').lean();
+    const expenses = await Expense.find()
+      .populate('withdrawAccount', 'name')
+      .populate('category', 'name')
+      .populate('createdBy', 'name email')
+      .lean();
 
     const data = expenses.map(exp => ({
       type: exp.type,
       name: exp.name,
+      category: exp.category?.name || '',
       amount: exp.amount,
       currency: exp.currency,
       date: exp.date?.toISOString().split('T')[0],
@@ -20,7 +25,7 @@ exports.exportExpensesCSV = async (req, res, next) => {
       notes: exp.notes || ''
     }));
 
-    const fields = ['type', 'name', 'amount', 'currency', 'date', 'withdrawAccount', 'createdBy', 'notes'];
+    const fields = ['type', 'name', 'category', 'amount', 'currency', 'date', 'withdrawAccount', 'createdBy', 'notes'];
     const parser = new Parser({ fields });
     const csv = parser.parse(data);
 
@@ -35,7 +40,11 @@ exports.exportExpensesCSV = async (req, res, next) => {
 // Excel Export
 exports.exportExpensesExcel = async (req, res, next) => {
   try {
-    const expenses = await Expense.find().populate('withdrawAccount', 'name').populate('createdBy', 'name email').lean();
+    const expenses = await Expense.find()
+      .populate('withdrawAccount', 'name')
+      .populate('category', 'name')
+      .populate('createdBy', 'name email')
+      .lean();
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Expenses');
@@ -43,6 +52,7 @@ exports.exportExpensesExcel = async (req, res, next) => {
     worksheet.columns = [
       { header: 'Type', key: 'type', width: 15 },
       { header: 'Name', key: 'name', width: 20 },
+      { header: 'Category', key: 'category', width: 18 },
       { header: 'Amount', key: 'amount', width: 12 },
       { header: 'Currency', key: 'currency', width: 8 },
       { header: 'Date', key: 'date', width: 12 },
@@ -55,6 +65,7 @@ exports.exportExpensesExcel = async (req, res, next) => {
       worksheet.addRow({
         type: exp.type,
         name: exp.name,
+        category: exp.category?.name || '',
         amount: exp.amount,
         currency: exp.currency,
         date: exp.date?.toISOString().split('T')[0],
@@ -76,7 +87,11 @@ exports.exportExpensesExcel = async (req, res, next) => {
 // PDF Export
 exports.exportExpensesPDF = async (req, res, next) => {
   try {
-    const expenses = await Expense.find().populate('withdrawAccount', 'name').populate('createdBy', 'name email').lean();
+    const expenses = await Expense.find()
+      .populate('withdrawAccount', 'name')
+      .populate('category', 'name')
+      .populate('createdBy', 'name email')
+      .lean();
 
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
     let buffers = [];
@@ -92,27 +107,29 @@ exports.exportExpensesPDF = async (req, res, next) => {
     doc.moveDown();
 
     // Table headers
-    doc.fontSize(10).text('Type', 30, doc.y, { width: 55, align: 'left' });
-    doc.text('Name', 85, doc.y, { width: 85, align: 'left' });
-    doc.text('Amount', 170, doc.y, { width: 45, align: 'right' });
-    doc.text('Currency', 215, doc.y, { width: 40, align: 'left' });
-    doc.text('Date', 255, doc.y, { width: 60, align: 'left' });
-    doc.text('Account', 315, doc.y, { width: 80, align: 'left' });
-    doc.text('User', 395, doc.y, { width: 70, align: 'left' });
-    doc.text('Notes', 465, doc.y, { width: 120, align: 'left' });
+    doc.fontSize(10).text('Type', 30, doc.y, { width: 50, align: 'left' });
+    doc.text('Name', 80, doc.y, { width: 75, align: 'left' });
+    doc.text('Category', 155, doc.y, { width: 60, align: 'left' });
+    doc.text('Amount', 215, doc.y, { width: 45, align: 'right' });
+    doc.text('Currency', 260, doc.y, { width: 35, align: 'left' });
+    doc.text('Date', 295, doc.y, { width: 55, align: 'left' });
+    doc.text('Account', 350, doc.y, { width: 70, align: 'left' });
+    doc.text('User', 420, doc.y, { width: 60, align: 'left' });
+    doc.text('Notes', 480, doc.y, { width: 90, align: 'left' });
     doc.moveDown(0.5);
     doc.moveTo(30, doc.y).lineTo(570, doc.y).stroke();
 
     // Table rows
     expenses.forEach(exp => {
-      doc.fontSize(9).text(exp.type, 30, doc.y, { width: 55 });
-      doc.text(exp.name, 85, doc.y, { width: 85 });
-      doc.text(exp.amount.toString(), 170, doc.y, { width: 45, align: 'right' });
-      doc.text(exp.currency, 215, doc.y, { width: 40 });
-      doc.text(exp.date?.toISOString().split('T')[0], 255, doc.y, { width: 60 });
-      doc.text(exp.withdrawAccount?.name || '', 315, doc.y, { width: 80 });
-      doc.text(exp.createdBy?.name || '', 395, doc.y, { width: 70 });
-      doc.text(exp.notes || '', 465, doc.y, { width: 120 });
+      doc.fontSize(9).text(exp.type, 30, doc.y, { width: 50 });
+      doc.text(exp.name, 80, doc.y, { width: 75 });
+      doc.text(exp.category?.name || '', 155, doc.y, { width: 60 });
+      doc.text(exp.amount.toString(), 215, doc.y, { width: 45, align: 'right' });
+      doc.text(exp.currency, 260, doc.y, { width: 35 });
+      doc.text(exp.date?.toISOString().split('T')[0], 295, doc.y, { width: 55 });
+      doc.text(exp.withdrawAccount?.name || '', 350, doc.y, { width: 70 });
+      doc.text(exp.createdBy?.name || '', 420, doc.y, { width: 60 });
+      doc.text(exp.notes || '', 480, doc.y, { width: 90 });
       doc.moveDown(0.4);
     });
 

@@ -1,6 +1,7 @@
 // controllers/leadController.js
 const Lead = require('../models/Lead');
 const mongoose = require('mongoose');
+const { logHistory } = require('../utils/historyLogger');
 
 const leadPopulate = [
   { path: 'leadBy', select: 'name email' },
@@ -81,6 +82,17 @@ exports.createLead = async (req, res, next) => {
     };
 
     const lead = await Lead.create(payload);
+    
+    // Log lead creation
+    await logHistory({
+      userId: req.userId,
+      action: 'create',
+      entityType: 'Lead',
+      entityId: lead._id,
+      newValue: lead.toObject(),
+      description: `Created lead: ${clientName}${companyName ? ` (${companyName})` : ''}`
+    });
+    
     res.status(201).json({ lead });
   } catch (err) {
     next(err);
@@ -153,6 +165,10 @@ exports.getLeadById = async (req, res, next) => {
 
 exports.updateLead = async (req, res, next) => {
   try {
+    // Get old value
+    const oldLead = await populateLeadQuery(Lead.findById(req.params.leadId));
+    if (!oldLead) return res.status(404).json({ error: 'Lead not found' });
+    
     const updated = await populateLeadQuery(Lead.findByIdAndUpdate(
       req.params.leadId,
       req.body,
@@ -165,6 +181,18 @@ exports.updateLead = async (req, res, next) => {
       await updated.save();
       await updated.populate(leadPopulate);
     }
+
+    // Log lead update
+    await logHistory({
+      userId: req.userId,
+      action: 'update',
+      entityType: 'Lead',
+      entityId: req.params.leadId,
+      oldValue: oldLead.toObject(),
+      newValue: updated.toObject(),
+      description: `Updated lead: ${updated.clientName}${updated.companyName ? ` (${updated.companyName})` : ''}`
+    });
+
     res.json({ lead: updated });
   } catch (err) {
     next(err);
@@ -175,6 +203,17 @@ exports.deleteLead = async (req, res, next) => {
   try {
     const deleted = await Lead.findByIdAndDelete(req.params.leadId);
     if (!deleted) return res.status(404).json({ error: 'Lead not found' });
+
+    // Log lead deletion
+    await logHistory({
+      userId: req.userId,
+      action: 'delete',
+      entityType: 'Lead',
+      entityId: req.params.leadId,
+      oldValue: deleted.toObject(),
+      description: `Deleted lead: ${deleted.clientName}${deleted.companyName ? ` (${deleted.companyName})` : ''}`
+    });
+
     res.json({ message: 'Lead deleted' });
   } catch (err) {
     next(err);

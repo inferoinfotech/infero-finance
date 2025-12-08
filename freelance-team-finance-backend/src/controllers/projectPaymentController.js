@@ -4,6 +4,7 @@ const Project = require('../models/Project');
 const Account = require('../models/Account');
 const HourlyWork = require('../models/HourlyWork');
 const { postAccountTxn } = require('../utils/ledger');
+const { logHistory } = require('../utils/historyLogger');
 
 async function runWithOptionalTx(workFn) {
   const conn = mongoose.connection;
@@ -115,6 +116,18 @@ exports.createPayment = async (req, res, next) => {
       proj.fixedPrice = (proj.fixedPrice || 0) + amt;
       await proj.save(session ? { session } : {});
 
+      // Log payment creation (after transaction commit)
+      if (!session) {
+        await logHistory({
+          userId: req.user.userId,
+          action: 'create',
+          entityType: 'Payment',
+          entityId: createdPayment._id,
+          newValue: createdPayment.toObject(),
+          description: `Added payment: ${amt} ${proj.currency || 'USD'} for project ${proj.name}`
+        });
+      }
+
       return res.status(201).json({ payment: createdPayment });
     }
 
@@ -186,6 +199,19 @@ exports.createPayment = async (req, res, next) => {
 
       proj.budget = (proj.budget || 0) + calcAmount;
       await proj.save(session ? { session } : {});
+
+      // Log payment creation (after transaction commit)
+      if (!session) {
+        await logHistory({
+          userId: req.user.userId,
+          action: 'create',
+          entityType: 'Payment',
+          entityId: createdPayment._id,
+          newValue: createdPayment.toObject(),
+          description: `Added payment: ${calcAmount} ${proj.currency || 'USD'} (${totalHours} hours) for project ${proj.name}`
+        });
+      }
+
       return res.status(201).json({ payment: createdPayment });
     }
 
@@ -369,6 +395,19 @@ exports.updatePayment = async (req, res, next) => {
     await project.save(opts);
 
     if (session) { await session.commitTransaction(); session.endSession(); }
+
+    // Log payment update (after transaction commit)
+    const oldPayment = payment.toObject();
+    await logHistory({
+      userId: req.user.userId,
+      action: 'update',
+      entityType: 'Payment',
+      entityId: paymentId,
+      oldValue: oldPayment,
+      newValue: updated.toObject(),
+      description: `Updated payment: ${updated.amount} ${project.currency || 'USD'} for project ${project.name}`
+    });
+
     res.json({ payment: updated });
   } catch (err) {
     if (session) { try { await session.abortTransaction(); session.endSession(); } catch {} }
@@ -423,6 +462,19 @@ exports.deletePayment = async (req, res, next) => {
     );
 
     await ProjectPayment.findByIdAndDelete(paymentId).session?.(session) ?? await ProjectPayment.findByIdAndDelete(paymentId);
+
+    // Log payment deletion (after transaction commit)
+    if (!session) {
+      await logHistory({
+        userId: req.user.userId,
+        action: 'delete',
+        entityType: 'Payment',
+        entityId: paymentId,
+        oldValue: payment.toObject(),
+        description: `Deleted payment: ${payment.amount} for project`
+      });
+    }
+
     res.json({ message: 'Payment deleted' });
   }).catch(next);
 };

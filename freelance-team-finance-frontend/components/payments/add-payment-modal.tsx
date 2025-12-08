@@ -1,10 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card";
+import { ModernInput } from "@/components/ui/modern-input";
+import { ModernSelect } from "@/components/ui/modern-select";
+import { ModernButton } from "@/components/ui/modern-button";
 import { X } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface Account {
   _id: string;
@@ -232,192 +234,166 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
   if (!isOpen) return null;
   if (!project) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <CardHeader>
-            <CardTitle>Loading Project Details...</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <ModernCard className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <ModernCardHeader>
+            <ModernCardTitle>Loading Project Details...</ModernCardTitle>
+          </ModernCardHeader>
+          <ModernCardContent>
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          </CardContent>
-        </Card>
+          </ModernCardContent>
+        </ModernCard>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <CardHeader>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <ModernCard className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <ModernCardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Add Payment</CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <ModernCardTitle>Add Payment</ModernCardTitle>
+            <ModernButton variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
-            </Button>
+            </ModernButton>
           </div>
-        </CardHeader>
-        <CardContent>
+        </ModernCardHeader>
+        <ModernCardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {errors.submit && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{errors.submit}</div>
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">{errors.submit}</div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* AMOUNT (editable for fixed, readonly for hourly) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount *</label>
-                <Input
-                  name="amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={handleChange}
-                  placeholder="Enter amount"
-                  className={errors.amount ? "border-red-500" : ""}
-                  readOnly={project.priceType === "hourly"}
-                />
-                {errors.amount && <p className="text-sm text-red-600">{errors.amount}</p>}
-              </div>
+              <ModernInput
+                name="amount"
+                type="number"
+                step="0.01"
+                value={formData.amount}
+                onChange={handleChange}
+                placeholder="Enter amount"
+                label="Amount *"
+                error={errors.amount}
+                readOnly={project.priceType === "hourly"}
+              />
               {/* PLATFORM CHARGE */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Platform Charge</label>
-                <Input
-                  name="platformCharge"
-                  type="number"
-                  step="0.01"
-                  value={formData.platformCharge}
-                  onChange={handleChange}
-                  placeholder="e.g., 10"
-                  className={errors.platformCharge ? "border-red-500" : ""}
-                />
-                {errors.platformCharge && <p className="text-sm text-red-600">{errors.platformCharge}</p>}
-              </div>
+              <ModernInput
+                name="platformCharge"
+                type="number"
+                step="0.01"
+                value={formData.platformCharge}
+                onChange={handleChange}
+                placeholder="e.g., 10"
+                label="Platform Charge"
+                error={errors.platformCharge}
+              />
               {/* CONVERSION RATE */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Conversion Rate *</label>
-                <Input
-                  name="conversionRate"
-                  type="number"
-                  step="0.01"
-                  value={formData.conversionRate}
-                  onChange={handleChange}
-                  placeholder="e.g., 83.5"
-                  className={errors.conversionRate ? "border-red-500" : ""}
-                />
-                {errors.conversionRate && <p className="text-sm text-red-600">{errors.conversionRate}</p>}
-              </div>
+              <ModernInput
+                name="conversionRate"
+                type="number"
+                step="0.01"
+                value={formData.conversionRate}
+                onChange={handleChange}
+                placeholder="e.g., 83.5"
+                label="Conversion Rate *"
+                error={errors.conversionRate}
+              />
               {/* AMOUNT IN INR (read-only) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount in INR</label>
-                <Input
+              <div className="space-y-1">
+                <ModernInput
                   name="amountInINR"
                   type="number"
                   value={amountInINR}
                   readOnly
-                  className="bg-gray-100 cursor-not-allowed"
+                  label="Amount in INR"
+                  className="bg-gray-50 cursor-not-allowed"
                 />
                 <span className="text-xs text-gray-500">Calculated as (Amount - Platform Charge) * Conversion Rate</span>
               </div>
               {/* PAYMENT DATE */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Payment Date *</label>
-                <Input
-                  name="paymentDate"
-                  type="date"
-                  value={formData.paymentDate}
-                  onChange={handleChange}
-                  className={errors.paymentDate ? "border-red-500" : ""}
-                />
-                {errors.paymentDate && <p className="text-sm text-red-600">{errors.paymentDate}</p>}
-              </div>
+              <ModernInput
+                name="paymentDate"
+                type="date"
+                value={formData.paymentDate}
+                onChange={handleChange}
+                label="Payment Date *"
+                error={errors.paymentDate}
+              />
               {/* WALLET */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Wallet Account</label>
-                <select
-                  name="platformWallet"
-                  value={formData.platformWallet}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.platformWallet ? "border-red-500" : "border-gray-300"}`}
-                >
-                  <option value="">Select Wallet Account</option>
-                  {accounts.filter(acc => acc.type === "wallet").map(acc => (
-                    <option key={acc._id} value={acc._id}>
-                      {acc.name} ({acc.type})
-                    </option>
-                  ))}
-                </select>
-                {errors.platformWallet && <p className="text-sm text-red-600">{errors.platformWallet}</p>}
-              </div>
+              <ModernSelect
+                name="platformWallet"
+                value={formData.platformWallet}
+                onChange={handleChange}
+                label="Wallet Account"
+                error={errors.platformWallet}
+                options={accounts.filter(acc => acc.type === "wallet").map(acc => ({
+                  value: acc._id,
+                  label: `${acc.name} (${acc.type})`
+                }))}
+              />
               {/* WALLET STATUS */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Wallet Status</label>
-                <select
-                  name="walletStatus"
-                  value={formData.walletStatus}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.walletStatus ? "border-red-500" : "border-gray-300"}`}
-                >
-                  <option value="on_hold">On Hold</option>
-                  <option value="released">Released</option>
-                </select>
-                {errors.walletStatus && <p className="text-sm text-red-600">{errors.walletStatus}</p>}
-              </div>
+              <ModernSelect
+                name="walletStatus"
+                value={formData.walletStatus}
+                onChange={handleChange}
+                label="Wallet Status"
+                error={errors.walletStatus}
+                options={[
+                  { value: "on_hold", label: "On Hold" },
+                  { value: "released", label: "Released" }
+                ]}
+              />
               {/* BANK */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Bank Account</label>
-                <select
-                  name="bankAccount"
-                  value={formData.bankAccount}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Bank Account (Optional)</option>
-                  {accounts.filter(acc => acc.type === "bank").map(acc => (
-                    <option key={acc._id} value={acc._id}>
-                      {acc.name} ({acc.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <ModernSelect
+                name="bankAccount"
+                value={formData.bankAccount}
+                onChange={handleChange}
+                label="Bank Account (Optional)"
+                options={accounts.filter(acc => acc.type === "bank").map(acc => ({
+                  value: acc._id,
+                  label: `${acc.name} (${acc.type})`
+                }))}
+              />
               {/* BANK STATUS */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Bank Status *</label>
-                <select
-                  name="bankStatus"
-                  value={formData.bankStatus}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.bankStatus ? "border-red-500" : "border-gray-300"}`}
-                  disabled={formData.walletStatus === "on_hold"}
-                >
-                  <option value="pending">Pending</option>
-                  <option value="received">Received</option>
-                </select>
-                {errors.bankStatus && <p className="text-sm text-red-600">{errors.bankStatus}</p>}
-              </div>
+              <ModernSelect
+                name="bankStatus"
+                value={formData.bankStatus}
+                onChange={handleChange}
+                label="Bank Status *"
+                error={errors.bankStatus}
+                disabled={formData.walletStatus === "on_hold"}
+                options={[
+                  { value: "pending", label: "Pending" },
+                  { value: "received", label: "Received" }
+                ]}
+              />
               {/* HOURLY FIELDS */}
               {project && project.priceType === "hourly" && (
                 <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Hours Billed *</label>
-                    <Input
-                      name="hoursBilled"
-                      type="number"
-                      step="0.1"
-                      value={formData.hoursBilled}
-                      readOnly
-                      className="bg-gray-100 cursor-not-allowed"
-                    />
-                    {errors.hoursBilled && <p className="text-sm text-red-600">{errors.hoursBilled}</p>}
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium">Hourly Work Entries *</label>
+                  <ModernInput
+                    name="hoursBilled"
+                    type="number"
+                    step="0.1"
+                    value={formData.hoursBilled}
+                    readOnly
+                    label="Hours Billed *"
+                    error={errors.hoursBilled}
+                    className="bg-gray-50 cursor-not-allowed"
+                  />
+                  <div className="md:col-span-2 space-y-1">
+                    <label className="text-sm font-medium text-gray-700">Hourly Work Entries *</label>
                     <select
                       name="hourlyWorkEntries"
                       multiple
                       value={formData.hourlyWorkEntries}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.hourlyWorkEntries ? "border-red-500" : "border-gray-300"}`}
+                      className={cn(
+                        "flex min-h-[12rem] w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm transition-all duration-200",
+                        "focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20",
+                        errors.hourlyWorkEntries && "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                      )}
                     >
                       {hourlyWorkOptions
                         .filter(e => !e.billed)
@@ -427,31 +403,29 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
                           </option>
                         ))}
                     </select>
-                    {errors.hourlyWorkEntries && <p className="text-sm text-red-600">{errors.hourlyWorkEntries}</p>}
+                    {errors.hourlyWorkEntries && <p className="text-xs text-red-500 mt-1">{errors.hourlyWorkEntries}</p>}
                   </div>
                 </>
               )}
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes (Optional)</label>
-              <Input
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                placeholder="Additional notes about this payment"
-              />
-            </div>
+            <ModernInput
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              placeholder="Additional notes about this payment"
+              label="Notes (Optional)"
+            />
             <div className="flex gap-4 pt-4">
-              <Button type="submit" disabled={loading} className="flex-1">
+              <ModernButton type="submit" disabled={loading} className="flex-1" loading={loading}>
                 {loading ? "Adding Payment..." : "Add Payment"}
-              </Button>
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+              </ModernButton>
+              <ModernButton type="button" variant="outline" onClick={onClose} className="flex-1">
                 Cancel
-              </Button>
+              </ModernButton>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </ModernCardContent>
+      </ModernCard>
     </div>
   );
 }

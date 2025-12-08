@@ -374,7 +374,8 @@ export default function ModernProjectDetailPage() {
                   <p className="text-gray-400">Start tracking your weekly hours</p>
                 </div>
               ) : (
-                <ModernTable>
+                <div className="overflow-hidden">
+                  <ModernTable>
                   <ModernTableHeader>
                     <ModernTableRow>
                       <ModernTableHead>Week Start</ModernTableHead>
@@ -435,6 +436,7 @@ export default function ModernProjectDetailPage() {
                     ))}
                   </ModernTableBody>
                 </ModernTable>
+                </div>
               )}
             </ModernCardContent>
           </ModernCard>

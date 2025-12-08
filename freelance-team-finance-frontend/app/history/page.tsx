@@ -27,8 +27,9 @@ interface HistoryEntry {
   _id: string
   action: string
   entity: string
-  entityId: string
-  changes: any
+  entityId: string | null
+  description: string
+  changes?: any
   user: {
     name: string
     email: string
@@ -60,11 +61,15 @@ export default function ModernHistoryPage() {
   }
 
   const filteredHistory = history.filter((entry) => {
-    const matchesSearch = entry.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.entity.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.user.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const searchLower = searchTerm.toLowerCase()
+    const matchesSearch = !searchTerm || 
+                         entry.action.toLowerCase().includes(searchLower) ||
+                         entry.entity.toLowerCase().includes(searchLower) ||
+                         entry.description.toLowerCase().includes(searchLower) ||
+                         entry.user.name.toLowerCase().includes(searchLower) ||
+                         entry.user.email.toLowerCase().includes(searchLower)
     const matchesAction = !actionFilter || entry.action === actionFilter
-    const matchesEntity = !entityFilter || entry.entity === entityFilter
+    const matchesEntity = !entityFilter || entry.entity.toLowerCase() === entityFilter.toLowerCase()
     return matchesSearch && matchesAction && matchesEntity
   })
 
@@ -73,6 +78,7 @@ export default function ModernHistoryPage() {
       case "create": return "success"
       case "update": return "info"
       case "delete": return "danger"
+      case "login": return "secondary"
       default: return "secondary"
     }
   }
@@ -82,6 +88,7 @@ export default function ModernHistoryPage() {
       case "create": return <Plus className="h-4 w-4" />
       case "update": return <Edit className="h-4 w-4" />
       case "delete": return <Trash2 className="h-4 w-4" />
+      case "login": return <User className="h-4 w-4" />
       default: return <Activity className="h-4 w-4" />
     }
   }
@@ -91,6 +98,13 @@ export default function ModernHistoryPage() {
       case "project": return <FileText className="h-4 w-4" />
       case "account": return <Database className="h-4 w-4" />
       case "expense": return <FileText className="h-4 w-4" />
+      case "lead": return <FileText className="h-4 w-4" />
+      case "payment": return <FileText className="h-4 w-4" />
+      case "hourlywork": return <Clock className="h-4 w-4" />
+      case "category": return <Database className="h-4 w-4" />
+      case "platform": return <Database className="h-4 w-4" />
+      case "user": return <User className="h-4 w-4" />
+      case "login": return <User className="h-4 w-4" />
       default: return <Database className="h-4 w-4" />
     }
   }
@@ -199,7 +213,8 @@ export default function ModernHistoryPage() {
                   { value: "", label: "All Actions" },
                   { value: "create", label: "Create" },
                   { value: "update", label: "Update" },
-                  { value: "delete", label: "Delete" }
+                  { value: "delete", label: "Delete" },
+                  { value: "login", label: "Login" }
                 ]}
               />
               <ModernSelect
@@ -209,9 +224,15 @@ export default function ModernHistoryPage() {
                 options={[
                   { value: "", label: "All Entities" },
                   { value: "project", label: "Projects" },
-                  { value: "account", label: "Accounts" },
                   { value: "expense", label: "Expenses" },
-                  { value: "platform", label: "Platforms" }
+                  { value: "account", label: "Accounts" },
+                  { value: "lead", label: "Leads" },
+                  { value: "payment", label: "Payments" },
+                  { value: "hourlywork", label: "Hourly Work" },
+                  { value: "category", label: "Categories" },
+                  { value: "platform", label: "Platforms" },
+                  { value: "user", label: "Users" },
+                  { value: "login", label: "Logins" }
                 ]}
               />
             </div>
@@ -246,7 +267,7 @@ export default function ModernHistoryPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           <ModernBadge variant={getActionColor(entry.action)}>
-                            {entry.action}
+                            {entry.action.toUpperCase()}
                           </ModernBadge>
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             {getEntityIcon(entry.entity)}
@@ -254,10 +275,13 @@ export default function ModernHistoryPage() {
                           </div>
                         </div>
 
+                        <p className="text-gray-800 font-medium mb-2">{entry.description}</p>
+
                         <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
                           <div className="flex items-center gap-1">
                             <User className="h-4 w-4" />
                             <span>{entry.user.name}</span>
+                            <span className="text-gray-400">({entry.user.email})</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
@@ -271,13 +295,26 @@ export default function ModernHistoryPage() {
                               <Eye className="h-3 w-3" />
                               View Changes
                               <span className="text-xs text-gray-400 ml-1">
-                                ({Object.keys(entry.changes).length} fields)
+                                ({Object.keys(entry.changes).length} fields changed)
                               </span>
                             </summary>
                             <div className="mt-3 p-4 bg-gray-50 rounded-xl border">
-                              <pre className="text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap">
-                                {JSON.stringify(entry.changes, null, 2)}
-                              </pre>
+                              <div className="space-y-2">
+                                {Object.entries(entry.changes).map(([key, change]: [string, any]) => (
+                                  <div key={key} className="text-xs">
+                                    <span className="font-semibold text-gray-700 capitalize">{key}:</span>
+                                    {'old' in change && (
+                                      <span className="text-red-600 ml-2">"{String(change.old)}"</span>
+                                    )}
+                                    {'old' in change && 'new' in change && (
+                                      <span className="mx-2 text-gray-400">→</span>
+                                    )}
+                                    {'new' in change && (
+                                      <span className="text-green-600">"{String(change.new)}"</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </details>
                         )}

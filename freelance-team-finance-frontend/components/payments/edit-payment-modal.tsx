@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { createPortal } from "react-dom";
+import { ModernButton } from "@/components/ui/modern-button";
+import { ModernInput } from "@/components/ui/modern-input";
+import { ModernSelect } from "@/components/ui/modern-select";
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card";
 import { apiClient } from "@/lib/api";
 import { formatDateDDMMYYYY } from "@/lib/utils";
 import { X } from "lucide-react";
@@ -72,6 +74,17 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
     platformCharge: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
 
   // Load payment/project/accounts when modal opens
   useEffect(() => {
@@ -264,212 +277,203 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
   };
 
   if (!isOpen || !payment) return null;
-  if (!project) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <CardHeader>
-            <CardTitle>Loading Project Details...</CardTitle>
-          </CardHeader>
-          <CardContent>
+
+  const modalContent = !project ? (
+    <div 
+      data-modal-backdrop
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[9999] p-4"
+      onClick={onClose}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{ pointerEvents: 'auto' }}
+      >
+        <ModernCard className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <ModernCardHeader>
+            <ModernCardTitle>Loading Project Details...</ModernCardTitle>
+          </ModernCardHeader>
+          <ModernCardContent>
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          </CardContent>
-        </Card>
+          </ModernCardContent>
+        </ModernCard>
       </div>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <CardHeader>
+    </div>
+  ) : (
+    <div 
+      data-modal-backdrop
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[9999] p-4"
+      onClick={onClose}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{ pointerEvents: 'auto' }}
+      >
+        <ModernCard className="w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <ModernCardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Edit Payment</CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <ModernCardTitle className="text-2xl">Edit Payment</ModernCardTitle>
+            <ModernButton variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
               <X className="h-4 w-4" />
-            </Button>
+            </ModernButton>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        </ModernCardHeader>
+        <ModernCardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
             {errors.submit && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{errors.submit}</div>
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">{errors.submit}</div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* AMOUNT (readonly for hourly) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount *</label>
-                <Input
-                  name="amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={handleChange}
-                  placeholder="Enter amount"
-                  className={errors.amount ? "border-red-500" : ""}
-                  readOnly={project.priceType === "hourly"}
-                />
-                {errors.amount && <p className="text-sm text-red-600">{errors.amount}</p>}
-              </div>
+              <ModernInput
+                label="Amount *"
+                name="amount"
+                type="number"
+                step="0.01"
+                value={formData.amount}
+                onChange={handleChange}
+                placeholder="Enter amount"
+                error={errors.amount}
+                readOnly={project.priceType === "hourly"}
+              />
               {/* CURRENCY */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Currency *</label>
-                <select
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.currency ? "border-red-500" : "border-gray-300"}`}
-                >
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="INR">INR</option>
-                </select>
-                {errors.currency && <p className="text-sm text-red-600">{errors.currency}</p>}
-              </div>
+              <ModernSelect
+                label="Currency *"
+                name="currency"
+                value={formData.currency}
+                onChange={handleChange}
+                error={errors.currency}
+                options={[
+                  { value: "USD", label: "USD" },
+                  { value: "EUR", label: "EUR" },
+                  { value: "GBP", label: "GBP" },
+                  { value: "INR", label: "INR" }
+                ]}
+              />
               {/* PLATFORM CHARGE */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Platform Charge *</label>
-                <Input
-                  name="platformCharge"
-                  type="number"
-                  step="0.01"
-                  value={formData.platformCharge}
-                  onChange={handleChange}
-                  placeholder="e.g., 10"
-                  className={errors.platformCharge ? "border-red-500" : ""}
-                />
-                {errors.platformCharge && <p className="text-sm text-red-600">{errors.platformCharge}</p>}
-              </div>
+              <ModernInput
+                label="Platform Charge *"
+                name="platformCharge"
+                type="number"
+                step="0.01"
+                value={formData.platformCharge}
+                onChange={handleChange}
+                placeholder="e.g., 10"
+                error={errors.platformCharge}
+              />
               {/* CONVERSION RATE */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Conversion Rate *</label>
-                <Input
-                  name="conversionRate"
-                  type="number"
-                  step="0.01"
-                  value={formData.conversionRate}
-                  onChange={handleChange}
-                  placeholder="e.g., 83.5"
-                  className={errors.conversionRate ? "border-red-500" : ""}
-                />
-                {errors.conversionRate && <p className="text-sm text-red-600">{errors.conversionRate}</p>}
-              </div>
+              <ModernInput
+                label="Conversion Rate *"
+                name="conversionRate"
+                type="number"
+                step="0.01"
+                value={formData.conversionRate}
+                onChange={handleChange}
+                placeholder="e.g., 83.5"
+                error={errors.conversionRate}
+              />
               {/* INR AMOUNT */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount in INR *</label>
-                <Input
-                  name="amountInINR"
-                  type="number"
-                  step="0.01"
-                  value={formData.amountInINR}
-                  readOnly
-                  className="bg-gray-100 cursor-not-allowed"
-                />
-                {errors.amountInINR && <p className="text-sm text-red-600">{errors.amountInINR}</p>}
-              </div>
+              <ModernInput
+                label="Amount in INR *"
+                name="amountInINR"
+                type="number"
+                step="0.01"
+                value={formData.amountInINR}
+                readOnly
+                error={errors.amountInINR}
+              />
               {/* PAYMENT DATE */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Payment Date *</label>
-                <Input
-                  name="paymentDate"
-                  type="date"
-                  value={formData.paymentDate}
-                  onChange={handleChange}
-                  className={errors.paymentDate ? "border-red-500" : ""}
-                />
-                {errors.paymentDate && <p className="text-sm text-red-600">{errors.paymentDate}</p>}
-              </div>
+              <ModernInput
+                label="Payment Date *"
+                name="paymentDate"
+                type="date"
+                value={formData.paymentDate}
+                onChange={handleChange}
+                error={errors.paymentDate}
+              />
               {/* WALLET */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Wallet Account *</label>
-                <select
-                  name="platformWallet"
-                  value={formData.platformWallet}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.platformWallet ? "border-red-500" : "border-gray-300"}`}
-                  required
-                >
-                  <option value="">Select Wallet Account</option>
-                  {accounts.filter(acc => acc.type === "wallet").map(acc => (
-                    <option key={acc._id} value={acc._id}>
-                      {acc.name} ({acc.type})
-                    </option>
-                  ))}
-                </select>
-                {errors.platformWallet && <p className="text-sm text-red-600">{errors.platformWallet}</p>}
-              </div>
+              <ModernSelect
+                label="Wallet Account *"
+                name="platformWallet"
+                value={formData.platformWallet}
+                onChange={handleChange}
+                error={errors.platformWallet}
+                required
+                options={[
+                  { value: "", label: "Select Wallet Account" },
+                  ...accounts.filter(acc => acc.type === "wallet").map(acc => ({
+                    value: acc._id,
+                    label: `${acc.name} (${acc.type})`
+                  }))
+                ]}
+              />
               {/* WALLET STATUS */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Wallet Status *</label>
-                <select
-                  name="walletStatus"
-                  value={formData.walletStatus}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.walletStatus ? "border-red-500" : "border-gray-300"}`}
-                >
-                  <option value="on_hold">On Hold</option>
-                  <option value="released">Released</option>
-                </select>
-                {errors.walletStatus && <p className="text-sm text-red-600">{errors.walletStatus}</p>}
-              </div>
+              <ModernSelect
+                label="Wallet Status *"
+                name="walletStatus"
+                value={formData.walletStatus}
+                onChange={handleChange}
+                error={errors.walletStatus}
+                options={[
+                  { value: "on_hold", label: "On Hold" },
+                  { value: "released", label: "Released" }
+                ]}
+              />
               {/* BANK */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Bank Account</label>
-                <select
-                  name="bankAccount"
-                  value={formData.bankAccount}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Bank Account (Optional)</option>
-                  {accounts.filter(acc => acc.type === "bank").map(acc => (
-                    <option key={acc._id} value={acc._id}>
-                      {acc.name} ({acc.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <ModernSelect
+                label="Bank Account"
+                name="bankAccount"
+                value={formData.bankAccount}
+                onChange={handleChange}
+                options={[
+                  { value: "", label: "Select Bank Account (Optional)" },
+                  ...accounts.filter(acc => acc.type === "bank").map(acc => ({
+                    value: acc._id,
+                    label: `${acc.name} (${acc.type})`
+                  }))
+                ]}
+              />
               {/* BANK STATUS */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Bank Status *</label>
-                <Input
-                  name="bankStatus"
-                  value={
-                    formData.walletStatus === "released"
-                      ? "received"
-                      : "pending"
-                  }
-                  readOnly
-                  className="bg-gray-100 cursor-not-allowed"
-                />
-                {errors.bankStatus && <p className="text-sm text-red-600">{errors.bankStatus}</p>}
-              </div>
+              <ModernInput
+                label="Bank Status *"
+                name="bankStatus"
+                value={
+                  formData.walletStatus === "released"
+                    ? "received"
+                    : "pending"
+                }
+                readOnly
+                error={errors.bankStatus}
+              />
               {/* HOURLY FIELDS */}
               {project && project.priceType === "hourly" && (
                 <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Hours Billed *</label>
-                    <Input
-                      name="hoursBilled"
-                      type="number"
-                      step="0.1"
-                      value={formData.hoursBilled}
-                      readOnly
-                      className={errors.hoursBilled ? "border-red-500 bg-gray-100 cursor-not-allowed" : "bg-gray-100 cursor-not-allowed"}
-                    />
-                    {errors.hoursBilled && <p className="text-sm text-red-600">{errors.hoursBilled}</p>}
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium">Hourly Work Entries *</label>
+                  <ModernInput
+                    label="Hours Billed *"
+                    name="hoursBilled"
+                    type="number"
+                    step="0.1"
+                    value={formData.hoursBilled}
+                    readOnly
+                    error={errors.hoursBilled}
+                  />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Hourly Work Entries * <span className="text-gray-500 text-xs">(Hold Ctrl/Cmd to select multiple)</span>
+                    </label>
                     <select
                       name="hourlyWorkEntries"
                       multiple
                       value={formData.hourlyWorkEntries}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.hourlyWorkEntries ? "border-red-500" : "border-gray-300"}`}
+                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                        errors.hourlyWorkEntries 
+                          ? "border-red-300 focus:ring-red-500" 
+                          : "border-gray-300 focus:border-blue-500"
+                      } bg-white min-h-[120px]`}
                     >
                       {hourlyWorkOptions.map(entry => (
                         <option key={entry._id} value={entry._id}>
@@ -480,31 +484,38 @@ export function EditPaymentModal({ payment, isOpen, onClose, onSuccess }: EditPa
                         </option>
                       ))}
                     </select>
-                    {errors.hourlyWorkEntries && <p className="text-sm text-red-600">{errors.hourlyWorkEntries}</p>}
+                    {errors.hourlyWorkEntries && (
+                      <p className="text-sm text-red-600 mt-1">{errors.hourlyWorkEntries}</p>
+                    )}
                   </div>
                 </>
               )}
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes (Optional)</label>
-              <Input
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                placeholder="Additional notes about this payment"
-              />
-            </div>
+            <ModernInput
+              label="Notes (Optional)"
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              placeholder="Additional notes about this payment"
+            />
             <div className="flex gap-4 pt-4">
-              <Button type="submit" disabled={loading} className="flex-1">
+              <ModernButton type="submit" disabled={loading} className="flex-1">
                 {loading ? "Updating Payment..." : "Update Payment"}
-              </Button>
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
+              </ModernButton>
+              <ModernButton type="button" variant="outline" onClick={onClose} className="flex-1">
                 Cancel
-              </Button>
+              </ModernButton>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </ModernCardContent>
+      </ModernCard>
+      </div>
     </div>
   );
+
+  // Use Portal to render outside normal DOM hierarchy
+  if (typeof window !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return null;
 }

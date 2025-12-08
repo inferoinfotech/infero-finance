@@ -59,8 +59,8 @@ function LeadsPageContent() {
   const [followUpPreset, setFollowUpPreset] = useState<"all" | "today" | "tomorrow" | "yesterday" | "custom">(
     (searchParams.get("followUpPreset") as "all" | "today" | "tomorrow" | "yesterday" | "custom") || "all"
   )
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "lost">(
-    (searchParams.get("statusFilter") as "all" | "active" | "lost") || "all"
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "lost" | "won">(
+    (searchParams.get("statusFilter") as "all" | "active" | "lost" | "won") || "all"
   )
 
   // Create modal
@@ -217,7 +217,8 @@ function LeadsPageContent() {
     })
     return sorted.filter((lead) => {
       if (statusFilter === "lost") return lead.stage === "Lost"
-      if (statusFilter === "active") return lead.stage !== "Lost"
+      if (statusFilter === "won") return lead.stage === "Won"
+      if (statusFilter === "active") return lead.stage !== "Lost" && lead.stage !== "Won"
       return true
     })
   }, [items, statusFilter])
@@ -438,10 +439,11 @@ function LeadsPageContent() {
               <ModernSelect
                 label="Status"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "lost")}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "lost" | "won")}
                 options={[
                   { value: "all", label: "All Leads" },
                   { value: "active", label: "Active Leads" },
+                  { value: "won", label: "Won Leads" },
                   { value: "lost", label: "Lost Leads" },
                 ]}
               />

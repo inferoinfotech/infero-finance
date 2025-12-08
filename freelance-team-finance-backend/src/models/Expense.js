@@ -5,8 +5,10 @@ const expenseSchema = new mongoose.Schema({
   name:            { type: String, required: true },
   amount:          { type: Number, required: true },
   date:            { type: Date, required: true },
+  category:        { type: mongoose.Schema.Types.ObjectId, ref: 'ExpenseCategory' },
   withdrawAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
   createdBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  toUser:          { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For personal expenses - which owner withdrew
   reminder:        { type: String },
   notes:           { type: String },
   createdAt:       { type: Date, default: Date.now }

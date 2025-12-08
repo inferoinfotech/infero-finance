@@ -1,5 +1,6 @@
 const HourlyWork = require('../models/HourlyWork');
 const Project = require('../models/Project');
+const { logHistory } = require('../utils/historyLogger');
 
 // Add new weekly hour log
 exports.addHourlyWork = async (req, res, next) => {
@@ -16,6 +17,16 @@ exports.addHourlyWork = async (req, res, next) => {
       weekStart,
       hours,
       user: req.user.userId
+    });
+
+    // Log hourly work creation
+    await logHistory({
+      userId: req.user.userId,
+      action: 'create',
+      entityType: 'HourlyWork',
+      entityId: hourlyWork._id,
+      newValue: hourlyWork.toObject(),
+      description: `Added ${hours} hours for week starting ${new Date(weekStart).toLocaleDateString()}`
     });
 
     res.status(201).json({ hourlyWork });
@@ -42,12 +53,28 @@ exports.updateHourlyWork = async (req, res, next) => {
   try {
     const { logId } = req.params;
     const { hours } = req.body;
+    
+    // Get old value
+    const oldLog = await HourlyWork.findOne({ _id: logId, user: req.user.userId });
+    if (!oldLog) return res.status(404).json({ error: 'Log not found' });
+    
     const updated = await HourlyWork.findOneAndUpdate(
       { _id: logId, user: req.user.userId },
       { hours },
       { new: true }
     );
-    if (!updated) return res.status(404).json({ error: 'Log not found' });
+
+    // Log hourly work update
+    await logHistory({
+      userId: req.user.userId,
+      action: 'update',
+      entityType: 'HourlyWork',
+      entityId: logId,
+      oldValue: oldLog.toObject(),
+      newValue: updated.toObject(),
+      description: `Updated hours from ${oldLog.hours} to ${hours} for week starting ${new Date(updated.weekStart).toLocaleDateString()}`
+    });
+
     res.json({ hourlyWork: updated });
   } catch (err) {
     next(err);
@@ -60,6 +87,17 @@ exports.deleteHourlyWork = async (req, res, next) => {
     const { logId } = req.params;
     const deleted = await HourlyWork.findOneAndDelete({ _id: logId, user: req.user.userId });
     if (!deleted) return res.status(404).json({ error: 'Log not found' });
+
+    // Log hourly work deletion
+    await logHistory({
+      userId: req.user.userId,
+      action: 'delete',
+      entityType: 'HourlyWork',
+      entityId: logId,
+      oldValue: deleted.toObject(),
+      description: `Deleted ${deleted.hours} hours for week starting ${new Date(deleted.weekStart).toLocaleDateString()}`
+    });
+
     res.json({ message: 'Log deleted' });
   } catch (err) {
     next(err);

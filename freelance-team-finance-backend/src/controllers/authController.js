@@ -2,6 +2,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { ROLES } = require('../models/User');
+const { logHistory } = require('../utils/historyLogger');
 
 function signToken(user) {
   return jwt.sign(
@@ -28,6 +29,17 @@ exports.register = async (req, res, next) => {
 
     const token = signToken(user);
 
+    // Log registration
+    await logHistory({
+      userId: user._id,
+      action: 'create',
+      entityType: 'User',
+      entityId: user._id,
+      newValue: { name: user.name, email: user.email, role: user.role },
+      description: `User registered: ${user.name} (${user.email})`,
+      metadata: { ip: req.ip, userAgent: req.get('user-agent') }
+    });
+
     res.status(201).json({
       message: 'User registered!',
       token,
@@ -49,6 +61,16 @@ exports.login = async (req, res, next) => {
     if (!match) return res.status(400).json({ error: 'Invalid credentials.' });
 
     const token = signToken(user);
+
+    // Log login
+    await logHistory({
+      userId: user._id,
+      action: 'login',
+      entityType: 'Login',
+      entityId: null,
+      description: `User logged in: ${user.name} (${user.email})`,
+      metadata: { ip: req.ip, userAgent: req.get('user-agent') }
+    });
 
     res.json({
       token,

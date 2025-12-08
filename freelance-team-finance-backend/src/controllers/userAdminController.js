@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { ROLES } = require('../models/User');
+const { logHistory } = require('../utils/historyLogger');
 
 // Create user (admin only)
 exports.adminCreateUser = async (req, res, next) => {
@@ -23,6 +24,16 @@ exports.adminCreateUser = async (req, res, next) => {
       email,
       password: hashed,
       role: role || ROLES.SALES,
+    });
+
+    // Log user creation
+    await logHistory({
+      userId: req.user.userId,
+      action: 'create',
+      entityType: 'User',
+      entityId: user._id,
+      newValue: { name: user.name, email: user.email, role: user.role },
+      description: `Admin created user: ${user.name} (${user.email}) with role ${user.role}`
     });
 
     res.status(201).json({
@@ -69,7 +80,25 @@ exports.adminUpdateUser = async (req, res, next) => {
       user.password = await bcrypt.hash(password, 12);
     }
 
+    // Get old value before save
+    const oldUser = {
+      name: user.name,
+      email: user.email,
+      role: user.role
+    };
+
     await user.save();
+
+    // Log user update
+    await logHistory({
+      userId: req.user.userId,
+      action: 'update',
+      entityType: 'User',
+      entityId: id,
+      oldValue: oldUser,
+      newValue: { name: user.name, email: user.email, role: user.role },
+      description: `Admin updated user: ${user.name} (${user.email})`
+    });
 
     res.json({
       message: 'User updated.',
@@ -95,6 +124,16 @@ exports.adminDeleteUser = async (req, res, next) => {
         return res.status(400).json({ error: 'Cannot delete the last admin.' });
       }
     }
+
+    // Log user deletion
+    await logHistory({
+      userId: req.user.userId,
+      action: 'delete',
+      entityType: 'User',
+      entityId: id,
+      oldValue: { name: user.name, email: user.email, role: user.role },
+      description: `Admin deleted user: ${user.name} (${user.email})`
+    });
 
     await User.deleteOne({ _id: id });
     res.json({ message: 'User deleted.' });

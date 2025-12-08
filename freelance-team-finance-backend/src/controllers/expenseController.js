@@ -1,14 +1,15 @@
 const Expense = require('../models/Expense');
 const Account = require('../models/Account');
 const { postAccountTxn } = require('../utils/ledger');
+const { logHistory } = require('../utils/historyLogger');
 
 // Add expense (general or personal)
 exports.createExpense = async (req, res, next) => {
   try {
-    const { type, name, amount, date, withdrawAccount, reminder, notes } = req.body;
+    const { type, name, amount, date, category, withdrawAccount, toUser, reminder, notes } = req.body;
 
     const expense = await Expense.create({
-      type, name, amount, date, withdrawAccount, reminder, notes,
+      type, name, amount, date, category, withdrawAccount, toUser, reminder, notes,
       createdBy: req.user.userId
     });
 
@@ -20,6 +21,16 @@ exports.createExpense = async (req, res, next) => {
       refType: 'expense',
       refId: expense._id,
       remark: `${type} expense: ${name}`
+    });
+
+    // Log expense creation
+    await logHistory({
+      userId: req.user.userId,
+      action: 'create',
+      entityType: 'Expense',
+      entityId: expense._id,
+      newValue: expense.toObject(),
+      description: `Created ${type} expense: ${name} (${amount})`
     });
 
     res.status(201).json({ expense });
@@ -34,7 +45,9 @@ exports.getExpenses = async (req, res, next) => {
     // Optional: filter by type, month, etc. via query params
     const expenses = await Expense.find()
       .populate('withdrawAccount', 'name type')
+      .populate('category', 'name description')
       .populate('createdBy', 'name email')
+      .populate('toUser', 'name email')
       .sort({ date: -1 });
     res.json({ expenses });
   } catch (err) {
@@ -51,11 +64,20 @@ exports.updateExpense = async (req, res, next) => {
     const oldExpense = await Expense.findOne({ _id: expenseId, createdBy: req.user.userId });
     if (!oldExpense) return res.status(404).json({ error: 'Expense not found' });
 
-    const updated = await Expense.findByIdAndUpdate(expenseId, updates, { new: true });
+    const newAmount = 'amount' in updates ? Number(updates.amount) : oldExpense.amount;
+    const accountChanged = updates.withdrawAccount && String(updates.withdrawAccount) !== String(oldExpense.withdrawAccount);
+    const amountChanged = 'amount' in updates && Number(updates.amount) !== oldExpense.amount;
 
-    // account changed?
-    if (updates.withdrawAccount && String(updates.withdrawAccount) !== String(oldExpense.withdrawAccount)) {
-      // refund old (CREDIT)
+    const updated = await Expense.findByIdAndUpdate(expenseId, updates, { new: true })
+      .populate('withdrawAccount', 'name type')
+      .populate('category', 'name description')
+      .populate('createdBy', 'name email')
+      .populate('toUser', 'name email');
+
+    // Handle account transactions
+    if (accountChanged) {
+      // Account changed: refund old account, debit new account
+      // Refund old account (CREDIT)
       await postAccountTxn({
         userId: req.user.userId,
         accountId: oldExpense.withdrawAccount,
@@ -65,21 +87,21 @@ exports.updateExpense = async (req, res, next) => {
         refId: oldExpense._id,
         remark: `Expense account change refund (${oldExpense.name})`
       });
-      // debit new
+      // Debit new account
       await postAccountTxn({
         userId: req.user.userId,
         accountId: updates.withdrawAccount,
         type: 'debit',
-        amount: updates.amount ?? oldExpense.amount,
+        amount: newAmount,
         refType: 'expense',
         refId: updated._id,
         remark: `Expense moved (${updated.name})`
       });
-    } else if ('amount' in updates && Number(updates.amount) !== oldExpense.amount) {
-      // diff on same account
-      const diff = Number(updates.amount) - oldExpense.amount;
+    } else if (amountChanged) {
+      // Amount changed on same account: adjust the difference
+      const diff = newAmount - oldExpense.amount;
       if (diff > 0) {
-        // more debit
+        // Amount increased: more debit
         await postAccountTxn({
           userId: req.user.userId,
           accountId: oldExpense.withdrawAccount,
@@ -90,7 +112,7 @@ exports.updateExpense = async (req, res, next) => {
           remark: `Expense increase (${updated.name})`
         });
       } else if (diff < 0) {
-        // credit back
+        // Amount decreased: credit back the difference
         await postAccountTxn({
           userId: req.user.userId,
           accountId: oldExpense.withdrawAccount,
@@ -102,6 +124,17 @@ exports.updateExpense = async (req, res, next) => {
         });
       }
     }
+
+    // Log expense update
+    await logHistory({
+      userId: req.user.userId,
+      action: 'update',
+      entityType: 'Expense',
+      entityId: expenseId,
+      oldValue: oldExpense.toObject(),
+      newValue: updated.toObject(),
+      description: `Updated expense: ${updated.name}`
+    });
 
     res.json({ expense: updated });
   } catch (err) {
@@ -126,6 +159,16 @@ exports.deleteExpense = async (req, res, next) => {
       refType: 'reversal',
       refId: deleted._id,
       remark: `Expense deleted (${deleted.name})`
+    });
+
+    // Log expense deletion
+    await logHistory({
+      userId: req.user.userId,
+      action: 'delete',
+      entityType: 'Expense',
+      entityId: expenseId,
+      oldValue: deleted.toObject(),
+      description: `Deleted expense: ${deleted.name}`
     });
 
     res.json({ message: 'Expense deleted' });

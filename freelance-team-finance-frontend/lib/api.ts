@@ -95,6 +95,38 @@ class ApiClient {
     })
   }
 
+  async updateExpense(expenseId: string, expenseData: any) {
+    return this.request(`/api/expenses/${expenseId}`, {
+      method: "PUT",
+      body: JSON.stringify(expenseData),
+    })
+  }
+
+  // Expense Categories endpoints
+  async getExpenseCategories() {
+    return this.request("/api/expense-categories")
+  }
+
+  async createExpenseCategory(categoryData: { name: string; description?: string }) {
+    return this.request("/api/expense-categories", {
+      method: "POST",
+      body: JSON.stringify(categoryData),
+    })
+  }
+
+  async updateExpenseCategory(categoryId: string, categoryData: { name: string; description?: string }) {
+    return this.request(`/api/expense-categories/${categoryId}`, {
+      method: "PUT",
+      body: JSON.stringify(categoryData),
+    })
+  }
+
+  async deleteExpenseCategory(categoryId: string) {
+    return this.request(`/api/expense-categories/${categoryId}`, {
+      method: "DELETE",
+    })
+  }
+
   // Accounts endpoints
   async getAccounts() {
     return this.request("/api/accounts")
@@ -138,7 +170,9 @@ class ApiClient {
 
   // History endpoint
   async getHistory() {
-    return this.request("/api/history")
+    const data = await this.request("/api/history")
+    // Backend returns array directly, not wrapped in { logs }
+    return Array.isArray(data) ? data : (data.logs || [])
   }
 
   async getProjectPayments(projectId: string) {

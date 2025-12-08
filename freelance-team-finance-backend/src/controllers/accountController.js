@@ -1,5 +1,6 @@
 const Account = require('../models/Account');
 const AccountTxn = require('../models/AccountTxn');
+const { logHistory } = require('../utils/historyLogger');
 
 // Add new account (bank or wallet)
 exports.createAccount = async (req, res, next) => {
@@ -11,6 +12,17 @@ exports.createAccount = async (req, res, next) => {
       name,
       details,
     });
+
+    // Log account creation
+    await logHistory({
+      userId: req.user.userId,
+      action: 'create',
+      entityType: 'Account',
+      entityId: account._id,
+      newValue: account.toObject(),
+      description: `Created ${type} account: ${name}`
+    });
+
     res.status(201).json({ account });
   } catch (err) {
     next(err);
@@ -32,12 +44,28 @@ exports.updateAccount = async (req, res, next) => {
   try {
     const { accountId } = req.params;
     const { name, details } = req.body;
+    
+    // Get old value
+    const oldAccount = await Account.findOne({ _id: accountId, user: req.user.userId });
+    if (!oldAccount) return res.status(404).json({ error: 'Account not found' });
+    
     const updated = await Account.findOneAndUpdate(
       { _id: accountId, user: req.user.userId },
       { name, details },
       { new: true }
     );
-    if (!updated) return res.status(404).json({ error: 'Account not found' });
+
+    // Log account update
+    await logHistory({
+      userId: req.user.userId,
+      action: 'update',
+      entityType: 'Account',
+      entityId: accountId,
+      oldValue: oldAccount.toObject(),
+      newValue: updated.toObject(),
+      description: `Updated account: ${updated.name}`
+    });
+
     res.json({ account: updated });
   } catch (err) {
     next(err);
@@ -50,6 +78,17 @@ exports.deleteAccount = async (req, res, next) => {
     const { accountId } = req.params;
     const deleted = await Account.findOneAndDelete({ _id: accountId, user: req.user.userId });
     if (!deleted) return res.status(404).json({ error: 'Account not found' });
+
+    // Log account deletion
+    await logHistory({
+      userId: req.user.userId,
+      action: 'delete',
+      entityType: 'Account',
+      entityId: accountId,
+      oldValue: deleted.toObject(),
+      description: `Deleted account: ${deleted.name}`
+    });
+
     res.json({ message: 'Account deleted' });
   } catch (err) {
     next(err);
