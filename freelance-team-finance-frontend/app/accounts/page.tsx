@@ -10,6 +10,7 @@ import { ModernBadge } from "@/components/ui/modern-badge"
 import { ModernTable, ModernTableBody, ModernTableCell, ModernTableHead, ModernTableHeader, ModernTableRow } from "@/components/ui/modern-table"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { EditAccountModal } from "@/components/accounts/edit-account-modal"
 import { apiClient } from "@/lib/api"
 import { formatDateTimeDDMMYYYY } from "@/lib/utils"
 import { 
@@ -20,11 +21,16 @@ import {
   Wallet, 
   DollarSign,
   Search,
-  Filter,
   Eye,
   TrendingUp,
-  Building2
+  Building2,
+  ExternalLink,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  Table
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import useSWR from "swr"
 
 interface Account {
@@ -63,11 +69,12 @@ const accountTypeOptions = [
 ]
 
 export default function ModernAccountsPage() {
+  const router = useRouter()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [typeFilter, setTypeFilter] = useState("")
+  const [activeTab, setActiveTab] = useState<"wallet" | "bank">("wallet")
   const [formData, setFormData] = useState({
     type: "bank",
     name: "",
@@ -76,6 +83,9 @@ export default function ModernAccountsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [statementOpen, setStatementOpen] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [downloading, setDownloading] = useState<string | null>(null)
 
   const {
     data: statement,
@@ -129,7 +139,7 @@ export default function ModernAccountsPage() {
         details: formData.details.trim(),
       })
       setShowAddForm(false)
-      setFormData({ type: "bank", name: "", details: "" })
+      setFormData({ type: activeTab, name: "", details: "" })
       setErrors({})
       fetchAccounts()
     } catch (error) {
@@ -159,16 +169,73 @@ export default function ModernAccountsPage() {
     setSelectedAccount(null)
   }
 
+  const handleDownloadFromModal = async (format: 'csv' | 'excel' | 'pdf') => {
+    if (!selectedAccount) return
+    
+    setDownloading(format)
+    try {
+      const token = localStorage.getItem("token")
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+      
+      const response = await fetch(
+        `${apiUrl}/api/accounts/${selectedAccount._id}/statement/export/${format}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        
+        const accountName = selectedAccount.name.replace(/\s+/g, '-')
+        const dateStr = new Date().toISOString().split('T')[0]
+        const ext = format === 'excel' ? 'xlsx' : format
+        a.download = `account-statement-${accountName}-${dateStr}.${ext}`
+        
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } else {
+        const error = await response.json()
+        alert(error.error || `Failed to download ${format.toUpperCase()} file`)
+      }
+    } catch (error) {
+      console.error(`Failed to download ${format}:`, error)
+      alert(`Failed to download ${format.toUpperCase()} file. Please try again.`)
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  const handleEdit = (account: Account) => {
+    setEditingAccount(account)
+    setShowEditModal(true)
+  }
+
+  const handleEditSuccess = () => {
+    fetchAccounts()
+    setShowEditModal(false)
+    setEditingAccount(null)
+  }
+
+  // Filter accounts by active tab and search
   const filteredAccounts = accounts.filter((account) => {
+    const matchesTab = account.type === activeTab
     const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          account.details.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = !typeFilter || account.type === typeFilter
-    return matchesSearch && matchesType
+    return matchesTab && matchesSearch
   })
 
   const totalBalance = accounts.reduce((sum, account) => sum + (account.balance || 0), 0)
   const bankBalance = accounts.filter(a => a.type === "bank").reduce((sum, a) => sum + (a.balance || 0), 0)
   const walletBalance = accounts.filter(a => a.type === "wallet").reduce((sum, a) => sum + (a.balance || 0), 0)
+  const activeTabBalance = activeTab === "bank" ? bankBalance : walletBalance
 
   if (loading) {
     return (
@@ -200,7 +267,10 @@ export default function ModernAccountsPage() {
               Manage your bank accounts and digital wallets in one place
             </p>
           </div>
-          <ModernButton onClick={() => setShowAddForm(true)}>
+          <ModernButton onClick={() => {
+            setFormData({ type: activeTab, name: "", details: "" })
+            setShowAddForm(true)
+          }}>
             <Plus className="h-4 w-4" />
             Add Account
           </ModernButton>
@@ -277,27 +347,47 @@ export default function ModernAccountsPage() {
           </ModernCard>
         </div>
 
-        {/* Filters */}
+        {/* Tabs and Search */}
         <ModernCard>
           <ModernCardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+              {/* Tabs */}
+              <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setActiveTab("wallet")}
+                  className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                    activeTab === "wallet"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Wallet className="h-4 w-4" />
+                    Wallet
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab("bank")}
+                  className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                    activeTab === "bank"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    Bank
+                  </div>
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="flex-1 lg:max-w-md">
                 <ModernInput
                   placeholder="Search accounts..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   icon={<Search className="h-4 w-4" />}
-                />
-              </div>
-              <div className="lg:w-48">
-                <ModernSelect
-                  label="Filter by Type"
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  options={[
-                    { value: "", label: "All Types" },
-                    ...accountTypeOptions
-                  ]}
                 />
               </div>
             </div>
@@ -353,7 +443,7 @@ export default function ModernAccountsPage() {
                   variant="outline"
                   onClick={() => {
                     setShowAddForm(false)
-                    setFormData({ type: "bank", name: "", details: "" })
+                    setFormData({ type: activeTab, name: "", details: "" })
                     setErrors({})
                   }}
                   className="flex-1"
@@ -365,85 +455,92 @@ export default function ModernAccountsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Accounts Table */}
+        {/* Accounts Cards */}
         <ModernCard>
           <ModernCardHeader>
             <div className="flex items-center justify-between">
-              <ModernCardTitle className="text-xl">All Accounts</ModernCardTitle>
+              <ModernCardTitle className="text-xl capitalize">
+                {activeTab === "wallet" ? "Digital Wallets" : "Bank Accounts"}
+              </ModernCardTitle>
               <ModernBadge variant="secondary">
-                {filteredAccounts.length} of {accounts.length}
+                {filteredAccounts.length} {filteredAccounts.length === 1 ? "account" : "accounts"}
               </ModernBadge>
             </div>
           </ModernCardHeader>
-          <ModernCardContent className="p-0">
+          <ModernCardContent>
             {filteredAccounts.length === 0 ? (
               <div className="text-center py-12">
-                <Wallet className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">No accounts found</p>
-                <p className="text-gray-400">Try adjusting your filters or add a new account</p>
+                {activeTab === "wallet" ? (
+                  <Wallet className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                ) : (
+                  <CreditCard className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                )}
+                <p className="text-gray-500 text-lg">No {activeTab} accounts found</p>
+                <p className="text-gray-400">Try adjusting your search or add a new account</p>
               </div>
             ) : (
-              <ModernTable>
-                <ModernTableHeader>
-                  <ModernTableRow>
-                    <ModernTableHead>Account</ModernTableHead>
-                    <ModernTableHead>Type</ModernTableHead>
-                    <ModernTableHead>Balance</ModernTableHead>
-                    <ModernTableHead>Details</ModernTableHead>
-                    <ModernTableHead className="text-right">Actions</ModernTableHead>
-                  </ModernTableRow>
-                </ModernTableHeader>
-                <ModernTableBody>
-                  {filteredAccounts.map((account) => (
-                    <ModernTableRow key={account._id}>
-                      <ModernTableCell>
-                        <div className="flex items-center gap-3">
-                          {account.type === "bank" ? (
-                            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                              <CreditCard className="h-5 w-5 text-blue-600" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredAccounts.map((account) => (
+                  <ModernCard key={account._id} className="hover:shadow-lg transition-shadow">
+                    <ModernCardContent className="p-6">
+                      <div className="space-y-4">
+                        {/* Header */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            {account.type === "bank" ? (
+                              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                                <CreditCard className="h-6 w-6 text-blue-600" />
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                                <Wallet className="h-6 w-6 text-green-600" />
+                              </div>
+                            )}
+                            <div>
+                              <h3 className="font-semibold text-lg text-gray-900">{account.name}</h3>
+                              <ModernBadge 
+                                variant={account.type === "bank" ? "default" : "success"}
+                                className="capitalize mt-1"
+                              >
+                                {account.type}
+                              </ModernBadge>
                             </div>
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                              <Wallet className="h-5 w-5 text-green-600" />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-semibold text-gray-900">{account.name}</div>
                           </div>
                         </div>
-                      </ModernTableCell>
-                      <ModernTableCell>
-                        <ModernBadge 
-                          variant={account.type === "bank" ? "default" : "success"}
-                          className="capitalize"
-                        >
-                          {account.type}
-                        </ModernBadge>
-                      </ModernTableCell>
-                      <ModernTableCell>
-                        <div className="font-semibold text-lg">
-                          ₹{(account.balance || 0).toLocaleString()}
+
+                        {/* Balance */}
+                        <div className="pt-4 border-t border-gray-100">
+                          <p className="text-sm text-gray-600 mb-1">Current Balance</p>
+                          <div className="text-2xl font-bold text-gray-900">
+                            ₹{(account.balance || 0).toLocaleString()}
+                          </div>
                         </div>
-                      </ModernTableCell>
-                      <ModernTableCell>
-                        <div className="max-w-xs truncate text-gray-600">
-                          {account.details}
+
+                        {/* Details */}
+                        <div className="pt-2">
+                          <p className="text-sm text-gray-600 mb-1">Details</p>
+                          <p className="text-sm text-gray-900 line-clamp-2">{account.details}</p>
                         </div>
-                      </ModernTableCell>
-                      <ModernTableCell className="text-right">
-                        <div className="flex items-center gap-2 justify-end">
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
                           <ModernButton
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenStatement(account)}
+                            className="flex-1"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
                           </ModernButton>
                           <ModernButton
                             variant="outline"
                             size="sm"
+                            onClick={() => handleEdit(account)}
+                            className="flex-1"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
                           </ModernButton>
                           <ModernButton
                             variant="outline"
@@ -454,11 +551,11 @@ export default function ModernAccountsPage() {
                             <Trash2 className="h-4 w-4" />
                           </ModernButton>
                         </div>
-                      </ModernTableCell>
-                    </ModernTableRow>
-                  ))}
-                </ModernTableBody>
-              </ModernTable>
+                      </div>
+                    </ModernCardContent>
+                  </ModernCard>
+                ))}
+              </div>
             )}
           </ModernCardContent>
         </ModernCard>
@@ -513,11 +610,65 @@ export default function ModernAccountsPage() {
                   </ModernCardContent>
                 </ModernCard>
 
-                {/* Transactions */}
+                {/* Transactions - Reversed order (newest first) */}
                 {Array.isArray(statement.txns) && statement.txns.length > 0 ? (
                   <ModernCard>
                     <ModernCardHeader>
-                      <ModernCardTitle>Recent Transactions</ModernCardTitle>
+                      <div className="flex items-center justify-between">
+                        <ModernCardTitle>Recent Transactions</ModernCardTitle>
+                        <div className="flex items-center gap-2">
+                          <ModernButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadFromModal('csv')}
+                            disabled={downloading !== null}
+                            title="Download CSV"
+                          >
+                            {downloading === 'csv' ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
+                            ) : (
+                              <Table className="h-3 w-3" />
+                            )}
+                          </ModernButton>
+                          <ModernButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadFromModal('excel')}
+                            disabled={downloading !== null}
+                            title="Download Excel"
+                          >
+                            {downloading === 'excel' ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
+                            ) : (
+                              <FileSpreadsheet className="h-3 w-3" />
+                            )}
+                          </ModernButton>
+                          <ModernButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadFromModal('pdf')}
+                            disabled={downloading !== null}
+                            title="Download PDF"
+                          >
+                            {downloading === 'pdf' ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
+                            ) : (
+                              <FileText className="h-3 w-3" />
+                            )}
+                          </ModernButton>
+                          <ModernButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              handleCloseStatement()
+                              router.push(`/accounts/${selectedAccount?._id}/statement`)
+                            }}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            View Full Statement
+                          </ModernButton>
+                        </div>
+                      </div>
                     </ModernCardHeader>
                     <ModernCardContent className="p-0">
                       <ModernTable>
@@ -531,7 +682,8 @@ export default function ModernAccountsPage() {
                           </ModernTableRow>
                         </ModernTableHeader>
                         <ModernTableBody>
-                          {statement.txns.map((txn) => (
+                          {/* Reverse the array to show newest first */}
+                          {[...statement.txns].reverse().map((txn) => (
                             <ModernTableRow key={txn._id}>
                               <ModernTableCell>
                                 <div className="text-sm">
@@ -582,6 +734,17 @@ export default function ModernAccountsPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Edit Account Modal */}
+        <EditAccountModal
+          account={editingAccount}
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false)
+            setEditingAccount(null)
+          }}
+          onSuccess={handleEditSuccess}
+        />
       </div>
     </ModernMainLayout>
   )

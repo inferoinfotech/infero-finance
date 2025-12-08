@@ -3,9 +3,11 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { createPortal } from "react-dom"
+import { ModernButton } from "@/components/ui/modern-button"
+import { ModernInput } from "@/components/ui/modern-input"
+import { ModernSelect } from "@/components/ui/modern-select"
+import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card"
 import { apiClient } from "@/lib/api"
 import { X } from "lucide-react"
 
@@ -98,74 +100,93 @@ export function EditAccountModal({ account, isOpen, onClose, onSuccess }: EditAc
     }
   }
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = originalOverflow
+      }
+    }
+  }, [isOpen])
+
   if (!isOpen || !account) return null
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Edit Account</CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {errors.submit && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{errors.submit}</div>
-            )}
+  const modalContent = (
+    <div 
+      data-modal-backdrop
+      className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[9999] p-4"
+      onClick={onClose}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{ pointerEvents: 'auto' }}
+      >
+        <ModernCard className="w-full max-w-2xl">
+          <ModernCardHeader>
+            <div className="flex justify-between items-center">
+              <ModernCardTitle className="text-2xl">Edit Account</ModernCardTitle>
+              <ModernButton variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+                <X className="h-4 w-4" />
+              </ModernButton>
+            </div>
+          </ModernCardHeader>
+          <ModernCardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">{errors.submit}</div>
+              )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Account Type *</label>
-              <select
+              <ModernSelect
+                label="Account Type *"
                 name="type"
                 value={formData.type}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="bank">Bank Account</option>
-                <option value="wallet">Digital Wallet</option>
-              </select>
-            </div>
+                error={errors.type}
+                options={[
+                  { value: "bank", label: "Bank Account" },
+                  { value: "wallet", label: "Digital Wallet" }
+                ]}
+              />
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Account Name *</label>
-              <Input
+              <ModernInput
+                label="Account Name *"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="e.g., HDFC Savings, PayPal"
-                className={errors.name ? "border-red-500" : ""}
+                error={errors.name}
               />
-              {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Account Details *</label>
-              <Input
+              <ModernInput
+                label="Account Details *"
                 name="details"
                 value={formData.details}
                 onChange={handleChange}
                 placeholder="Account number, email, or other identifying details"
-                className={errors.details ? "border-red-500" : ""}
+                error={errors.details}
               />
-              {errors.details && <p className="text-sm text-red-600">{errors.details}</p>}
-            </div>
 
-            <div className="flex gap-4 pt-4">
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? "Updating..." : "Update Account"}
-              </Button>
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1 bg-transparent">
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="flex gap-4 pt-4">
+                <ModernButton type="submit" disabled={loading} className="flex-1">
+                  {loading ? "Updating..." : "Update Account"}
+                </ModernButton>
+                <ModernButton type="button" variant="outline" onClick={onClose} className="flex-1">
+                  Cancel
+                </ModernButton>
+              </div>
+            </form>
+          </ModernCardContent>
+        </ModernCard>
+      </div>
     </div>
   )
+
+  // Use Portal to render outside normal DOM hierarchy
+  if (typeof window !== 'undefined') {
+    return createPortal(modalContent, document.body)
+  }
+  return null
 }
