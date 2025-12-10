@@ -46,7 +46,12 @@ exports.createProject = async (req, res, next) => {
 // Get all projects for the logged-in user
 exports.getProjects = async (req, res, next) => {
   try {
-    const projects = await Project.find({ createdBy: req.user.userId })
+    // Admin and Owner see all projects, others see only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner') 
+      ? {} 
+      : { createdBy: req.user.userId };
+    
+    const projects = await Project.find(query)
       .populate('platform', 'name chargePercentage')
       .sort({ createdAt: -1 });
     res.json({ projects });
@@ -59,7 +64,12 @@ exports.getProjects = async (req, res, next) => {
 exports.getProjectById = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const project = await Project.findOne({ _id: projectId, createdBy: req.user.userId })
+    // Admin and Owner can see any project, others only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: projectId }
+      : { _id: projectId, createdBy: req.user.userId };
+    
+    const project = await Project.findOne(query)
       .populate('platform', 'name chargePercentage');
     if (!project) return res.status(404).json({ error: 'Project not found' });
     res.json({ project });
@@ -74,11 +84,16 @@ exports.updateProject = async (req, res, next) => {
     const { projectId } = req.params;
     const updates = req.body;
 
+    // Admin and Owner can update any project, others only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: projectId }
+      : { _id: projectId, createdBy: req.user.userId };
+
     // Get previous project for oldValue (for diff)
-    const previousProject = await Project.findOne({ _id: projectId, createdBy: req.user.userId });
+    const previousProject = await Project.findOne(query);
 
     const project = await Project.findOneAndUpdate(
-      { _id: projectId, createdBy: req.user.userId },
+      query,
       updates,
       { new: true }
     );
@@ -106,7 +121,12 @@ exports.updateProject = async (req, res, next) => {
 exports.deleteProject = async (req, res, next) => {
   try {
     const { projectId } = req.params;
-    const deleted = await Project.findOneAndDelete({ _id: projectId, createdBy: req.user.userId });
+    // Admin and Owner can delete any project, others only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: projectId }
+      : { _id: projectId, createdBy: req.user.userId };
+    
+    const deleted = await Project.findOneAndDelete(query);
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
 
     // Log project deletion

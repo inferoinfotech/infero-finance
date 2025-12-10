@@ -42,8 +42,13 @@ exports.createExpense = async (req, res, next) => {
 // Get all expenses (you can also filter by type/user)
 exports.getExpenses = async (req, res, next) => {
   try {
+    // Admin and Owner see all expenses, others see only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? {}
+      : { createdBy: req.user.userId };
+    
     // Optional: filter by type, month, etc. via query params
-    const expenses = await Expense.find()
+    const expenses = await Expense.find(query)
       .populate('withdrawAccount', 'name type')
       .populate('category', 'name description')
       .populate('createdBy', 'name email')
@@ -61,7 +66,12 @@ exports.updateExpense = async (req, res, next) => {
     const { expenseId } = req.params;
     const updates = req.body;
 
-    const oldExpense = await Expense.findOne({ _id: expenseId, createdBy: req.user.userId });
+    // Admin and Owner can update any expense, others only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: expenseId }
+      : { _id: expenseId, createdBy: req.user.userId };
+
+    const oldExpense = await Expense.findOne(query);
     if (!oldExpense) return res.status(404).json({ error: 'Expense not found' });
 
     const newAmount = 'amount' in updates ? Number(updates.amount) : oldExpense.amount;
@@ -148,7 +158,12 @@ exports.updateExpense = async (req, res, next) => {
 exports.deleteExpense = async (req, res, next) => {
   try {
     const { expenseId } = req.params;
-    const deleted = await Expense.findOneAndDelete({ _id: expenseId, createdBy: req.user.userId });
+    // Admin and Owner can delete any expense, others only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: expenseId }
+      : { _id: expenseId, createdBy: req.user.userId };
+    
+    const deleted = await Expense.findOneAndDelete(query);
     if (!deleted) return res.status(404).json({ error: 'Expense not found' });
 
     await postAccountTxn({

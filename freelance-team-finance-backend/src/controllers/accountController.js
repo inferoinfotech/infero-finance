@@ -39,7 +39,12 @@ exports.createAccount = async (req, res, next) => {
 // Get all accounts for logged-in user
 exports.getAccounts = async (req, res, next) => {
   try {
-    const accounts = await Account.find({ user: req.user.userId });
+    // Admin and Owner see all accounts, others see only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? {}
+      : { user: req.user.userId };
+    
+    const accounts = await Account.find(query);
     res.json({ accounts });
   } catch (err) {
     next(err);
@@ -52,12 +57,17 @@ exports.updateAccount = async (req, res, next) => {
     const { accountId } = req.params;
     const { name, details } = req.body;
     
+    // Admin and Owner can update any account, others only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: accountId }
+      : { _id: accountId, user: req.user.userId };
+    
     // Get old value
-    const oldAccount = await Account.findOne({ _id: accountId, user: req.user.userId });
+    const oldAccount = await Account.findOne(query);
     if (!oldAccount) return res.status(404).json({ error: 'Account not found' });
     
     const updated = await Account.findOneAndUpdate(
-      { _id: accountId, user: req.user.userId },
+      query,
       { name, details },
       { new: true }
     );
@@ -83,7 +93,12 @@ exports.updateAccount = async (req, res, next) => {
 exports.deleteAccount = async (req, res, next) => {
   try {
     const { accountId } = req.params;
-    const deleted = await Account.findOneAndDelete({ _id: accountId, user: req.user.userId });
+    // Admin and Owner can delete any account, others only their own
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: accountId }
+      : { _id: accountId, user: req.user.userId };
+    
+    const deleted = await Account.findOneAndDelete(query);
     if (!deleted) return res.status(404).json({ error: 'Account not found' });
 
     // Log account deletion
@@ -115,12 +130,19 @@ exports.getAccountStatement = async (req, res, next) => {
     const endDate = req.query.endDate ? new Date(req.query.endDate) : null;
     const searchTerm = req.query.search; // Search in remark field
 
-    // ensure account belongs to user
-    const acc = await Account.findOne({ _id: accountId, user: req.user.userId });
+    // Admin and Owner can access any account, others only their own
+    const accountQuery = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: accountId }
+      : { _id: accountId, user: req.user.userId };
+    
+    const acc = await Account.findOne(accountQuery);
     if (!acc) return res.status(404).json({ error: 'Account not found' });
 
-    // Build query
-    const query = { account: accountId, user: req.user.userId };
+    // Build query - Admin/Owner can see all transactions for this account
+    const query = { account: accountId };
+    if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+      query.user = req.user.userId;
+    }
     
     if (typeFilter && (typeFilter === 'credit' || typeFilter === 'debit')) {
       query.type = typeFilter;
@@ -162,7 +184,11 @@ exports.getAccountStatement = async (req, res, next) => {
 
 // Helper function to build query with filters
 const buildStatementQuery = (accountId, userId, req) => {
-  const query = { account: accountId, user: userId };
+  const query = { account: accountId };
+  // Admin and Owner can see all transactions, others only their own
+  if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+    query.user = userId;
+  }
   
   const typeFilter = req.query.type;
   const startDate = req.query.startDate ? new Date(req.query.startDate) : null;
@@ -194,7 +220,12 @@ const buildStatementQuery = (accountId, userId, req) => {
 exports.exportStatementCSV = async (req, res, next) => {
   try {
     const { accountId } = req.params;
-    const acc = await Account.findOne({ _id: accountId, user: req.user.userId });
+    // Admin and Owner can export any account, others only their own
+    const accountQuery = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: accountId }
+      : { _id: accountId, user: req.user.userId };
+    
+    const acc = await Account.findOne(accountQuery);
     if (!acc) return res.status(404).json({ error: 'Account not found' });
 
     const query = buildStatementQuery(accountId, req.user.userId, req);
@@ -226,7 +257,12 @@ exports.exportStatementCSV = async (req, res, next) => {
 exports.exportStatementExcel = async (req, res, next) => {
   try {
     const { accountId } = req.params;
-    const acc = await Account.findOne({ _id: accountId, user: req.user.userId });
+    // Admin and Owner can export any account, others only their own
+    const accountQuery = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: accountId }
+      : { _id: accountId, user: req.user.userId };
+    
+    const acc = await Account.findOne(accountQuery);
     if (!acc) return res.status(404).json({ error: 'Account not found' });
 
     const query = buildStatementQuery(accountId, req.user.userId, req);
@@ -291,7 +327,12 @@ exports.exportStatementExcel = async (req, res, next) => {
 exports.exportStatementPDF = async (req, res, next) => {
   try {
     const { accountId } = req.params;
-    const acc = await Account.findOne({ _id: accountId, user: req.user.userId });
+    // Admin and Owner can export any account, others only their own
+    const accountQuery = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? { _id: accountId }
+      : { _id: accountId, user: req.user.userId };
+    
+    const acc = await Account.findOne(accountQuery);
     if (!acc) return res.status(404).json({ error: 'Account not found' });
 
     const query = buildStatementQuery(accountId, req.user.userId, req);

@@ -294,13 +294,13 @@ export default function ModernAccountsPage() {
               <ArrowRightLeft className="h-4 w-4 mr-2" />
               Transfer Money
             </ModernButton>
-            <ModernButton onClick={() => {
-              setFormData({ type: activeTab, name: "", details: "" })
-              setShowAddForm(true)
-            }}>
-              <Plus className="h-4 w-4" />
-              Add Account
-            </ModernButton>
+          <ModernButton onClick={() => {
+            setFormData({ type: activeTab, name: "", details: "" })
+            setShowAddForm(true)
+          }}>
+            <Plus className="h-4 w-4" />
+            Add Account
+          </ModernButton>
           </div>
         </div>
 
