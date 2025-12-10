@@ -310,19 +310,76 @@ exports.updatePayment = async (req, res, next) => {
     }
 
     const oldWalletStatus = payment.walletStatus;
-    const amountInINR = payment.amountInINR;
+    const oldAmountInINR = payment.amountInINR;
     const walletId = updates.platformWallet || payment.platformWallet;
     const bankId = updates.bankAccount || payment.bankAccount;
+
+    // Recalculate amountInINR if amount, platformCharge, or conversionRate changed
+    let newAmountInINR = oldAmountInINR;
+    const amount = updates.amount !== undefined ? Number(updates.amount) : payment.amount;
+    const platformCharge = updates.platformCharge !== undefined ? Number(updates.platformCharge) : payment.platformCharge;
+    const conversionRate = updates.conversionRate !== undefined ? Number(updates.conversionRate) : payment.conversionRate;
+    
+    if (updates.amount !== undefined || updates.platformCharge !== undefined || updates.conversionRate !== undefined) {
+      newAmountInINR = (amount - (platformCharge || 0)) * conversionRate;
+      updates.amountInINR = newAmountInINR;
+    }
+
+    // Handle amount/conversionRate changes without status change
+    if (newAmountInINR !== oldAmountInINR && !(updates.walletStatus && updates.walletStatus !== oldWalletStatus)) {
+      const difference = newAmountInINR - oldAmountInINR;
+      
+      if (oldWalletStatus === 'on_hold' && walletId) {
+        // Adjust wallet balance
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: walletId,
+          type: difference > 0 ? 'credit' : 'debit',
+          amount: Math.abs(difference),
+          refType: 'payment',
+          refId: payment._id,
+          remark: `Amount adjustment (payment ${payment._id})`
+        }, session);
+      } else if (oldWalletStatus === 'released' && bankId) {
+        // Adjust bank balance
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: bankId,
+          type: difference > 0 ? 'credit' : 'debit',
+          amount: Math.abs(difference),
+          refType: 'payment',
+          refId: payment._id,
+          remark: `Amount adjustment (payment ${payment._id})`
+        }, session);
+      }
+    }
 
     if (updates.walletStatus && updates.walletStatus !== oldWalletStatus) {
       // RELEASE: wallet -> bank
       if (oldWalletStatus === 'on_hold' && updates.walletStatus === 'released') {
+        // If conversionRate changed, first adjust wallet balance to new amount
+        if (newAmountInINR !== oldAmountInINR && walletId) {
+          const walletAdjustment = newAmountInINR - oldAmountInINR;
+          if (walletAdjustment !== 0) {
+            await postAccountTxn({
+              userId: req.user.userId,
+              accountId: walletId,
+              type: walletAdjustment > 0 ? 'credit' : 'debit',
+              amount: Math.abs(walletAdjustment),
+              refType: 'payment',
+              refId: payment._id,
+              remark: `Rate adjustment before release (payment ${payment._id})`
+            }, session);
+          }
+        }
+        
+        // Now deduct NEW amount from wallet and add to bank
         if (walletId) {
           await postAccountTxn({
             userId: req.user.userId,
             accountId: walletId,
             type: 'debit',
-            amount: amountInINR,
+            amount: newAmountInINR,
             refType: 'transfer',
             refId: payment._id,
             remark: `Release to bank (payment ${payment._id})`
@@ -333,7 +390,7 @@ exports.updatePayment = async (req, res, next) => {
             userId: req.user.userId,
             accountId: bankId,
             type: 'credit',
-            amount: amountInINR,
+            amount: newAmountInINR,
             refType: 'transfer',
             refId: payment._id,
             remark: `Received from wallet (payment ${payment._id})`
@@ -344,12 +401,29 @@ exports.updatePayment = async (req, res, next) => {
 
       // REVERT: bank -> wallet
       if (oldWalletStatus === 'released' && updates.walletStatus === 'on_hold') {
+        // If conversionRate changed, first adjust bank balance
+        if (newAmountInINR !== oldAmountInINR && bankId) {
+          const bankAdjustment = newAmountInINR - oldAmountInINR;
+          if (bankAdjustment !== 0) {
+            await postAccountTxn({
+              userId: req.user.userId,
+              accountId: bankId,
+              type: bankAdjustment > 0 ? 'credit' : 'debit',
+              amount: Math.abs(bankAdjustment),
+              refType: 'payment',
+              refId: payment._id,
+              remark: `Rate adjustment before revert (payment ${payment._id})`
+            }, session);
+          }
+        }
+        
+        // Deduct NEW amount from bank and add to wallet
         if (bankId) {
           await postAccountTxn({
             userId: req.user.userId,
             accountId: bankId,
             type: 'debit',
-            amount: amountInINR,
+            amount: newAmountInINR,
             refType: 'transfer',
             refId: payment._id,
             remark: `Revert to wallet (payment ${payment._id})`
@@ -360,7 +434,7 @@ exports.updatePayment = async (req, res, next) => {
             userId: req.user.userId,
             accountId: walletId,
             type: 'credit',
-            amount: amountInINR,
+            amount: newAmountInINR,
             refType: 'transfer',
             refId: payment._id,
             remark: `Reverted from bank (payment ${payment._id})`

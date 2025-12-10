@@ -78,9 +78,9 @@ export function PaymentList({ payments, onPaymentUpdate }: PaymentListProps) {
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
         {payments.map((payment) => (
-          <div key={payment._id} className="border rounded-lg p-4">
+          <div key={payment._id} className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">

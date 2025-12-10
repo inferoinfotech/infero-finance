@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 
 const ModernTable = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto rounded-2xl border border-gray-100 bg-white shadow-sm">
+    <div className="relative w-full overflow-auto rounded-2xl border border-gray-100 bg-white shadow-sm max-h-[70vh]">
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   )
@@ -14,7 +14,7 @@ const ModernTableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAt
   ({ className, ...props }, ref) => (
     <thead 
       ref={ref} 
-      className={cn("bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200", className)} 
+      className={cn("bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 sticky top-0 z-10", className)} 
       {...props} 
     />
   )

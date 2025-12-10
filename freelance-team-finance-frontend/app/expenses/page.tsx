@@ -12,6 +12,7 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { apiClient } from "@/lib/api"
 import { formatDateDDMMYYYY } from "@/lib/utils"
+import { initializeReminderChecker, requestNotificationPermission } from "@/lib/reminderNotifications"
 import { 
   Plus, 
   Search, 
@@ -25,7 +26,8 @@ import {
   User,
   FileText,
   TrendingDown,
-  X
+  X,
+  Bell
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -57,6 +59,8 @@ interface Expense {
   category?: ExpenseCategory | string
   withdrawAccount?: string | Account
   toUser?: User | string
+  reminder?: string
+  reminderDate?: string
   notes: string
   createdBy?: {
     name: string
@@ -70,7 +74,7 @@ export default function ModernExpensesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
-  const [activeTab, setActiveTab] = useState<"general" | "personal">("general")
+  const [activeTab, setActiveTab] = useState<"general" | "personal" | "upcoming">("general")
   const [searchTerm, setSearchTerm] = useState("")
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<ExpenseCategory[]>([])
@@ -93,6 +97,8 @@ export default function ModernExpensesPage() {
     toUser: "",
     walletAccount: "",
     bankAccount: "",
+    reminder: "",
+    reminderDate: "",
     notes: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -102,6 +108,18 @@ export default function ModernExpensesPage() {
     fetchAccounts()
     fetchCategories()
     fetchOwnerUsers()
+
+    // Initialize reminder notifications
+    const initReminders = async () => {
+      await requestNotificationPermission()
+      // Check reminders every hour
+      initializeReminderChecker(async () => {
+        const data = await apiClient.getExpenses()
+        const expensesArr = Array.isArray(data) ? data : Array.isArray(data.expenses) ? data.expenses : []
+        return expensesArr.filter((e: Expense) => e.reminderDate) as any[]
+      }, 60)
+    }
+    initReminders()
   }, [])
 
   const fetchOwnerUsers = async () => {
@@ -239,6 +257,16 @@ export default function ModernExpensesPage() {
       // Include notes (can be empty string)
       expenseData.notes = formData.notes || ""
       
+      // Handle reminder and reminderDate
+      if (formData.reminder && formData.reminderDate) {
+        expenseData.reminder = formData.reminder
+        expenseData.reminderDate = formData.reminderDate
+      } else {
+        // Clear reminder if not set
+        expenseData.reminder = null
+        expenseData.reminderDate = null
+      }
+      
       if (editingExpense) {
         // Update existing expense
         await apiClient.updateExpense(editingExpense._id, expenseData)
@@ -250,7 +278,7 @@ export default function ModernExpensesPage() {
       setShowAddForm(false)
       setEditingExpense(null)
       setFormData({
-        type: activeTab,
+        type: activeTab === "upcoming" ? "general" : activeTab,
         name: "",
         amount: "",
         date: new Date().toISOString().split("T")[0],
@@ -258,6 +286,8 @@ export default function ModernExpensesPage() {
         toUser: "",
         walletAccount: "",
         bankAccount: "",
+        reminder: "",
+        reminderDate: "",
         notes: "",
       })
       setErrors({})
@@ -287,6 +317,8 @@ export default function ModernExpensesPage() {
       toUser: typeof expense.toUser === "object" ? expense.toUser._id : (expense.toUser || ""),
       walletAccount: isWallet ? (accountId || "") : "",
       bankAccount: !isWallet ? (accountId || "") : "",
+      reminder: expense.reminder || "",
+      reminderDate: expense.reminderDate ? new Date(expense.reminderDate).toISOString().split("T")[0] : "",
       notes: expense.notes || "",
     })
     setEditingExpense(expense)
@@ -314,8 +346,16 @@ export default function ModernExpensesPage() {
   }, [expenses])
 
   const filteredExpenses = expenses.filter((expense) => {
-    // Filter by active tab (general or personal)
-    const matchesTab = expense.type === activeTab
+    // Filter by active tab
+    let matchesTab = false
+    if (activeTab === "upcoming") {
+      // For upcoming tab, show expenses with reminderDate set
+      matchesTab = !!expense.reminderDate
+    } else {
+      // For general/personal tabs, filter by type
+      matchesTab = expense.type === activeTab
+    }
+    
     const matchesSearch = expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          expense.notes.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesUser = !userFilter || expense.createdBy?.name === userFilter
@@ -371,6 +411,7 @@ export default function ModernExpensesPage() {
   const allExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
   const generalExpenses = expenses.filter(e => e.type === "general").reduce((sum, e) => sum + e.amount, 0)
   const personalExpenses = expenses.filter(e => e.type === "personal").reduce((sum, e) => sum + e.amount, 0)
+  const upcomingExpenses = expenses.filter(e => e.reminderDate).reduce((sum, e) => sum + e.amount, 0)
 
   if (loading) {
     return (
@@ -405,7 +446,7 @@ export default function ModernExpensesPage() {
           <ModernButton onClick={() => {
             setEditingExpense(null)
             setFormData({
-              type: activeTab,
+              type: activeTab === "upcoming" ? "general" : activeTab,
               name: "",
               amount: "",
               date: new Date().toISOString().split("T")[0],
@@ -413,6 +454,8 @@ export default function ModernExpensesPage() {
               toUser: "",
               walletAccount: "",
               bankAccount: "",
+              reminder: "",
+              reminderDate: "",
               notes: "",
             })
             setErrors({})
@@ -456,6 +499,24 @@ export default function ModernExpensesPage() {
           >
             Personal Withdrawals
           </button>
+          <button
+            onClick={() => {
+              setActiveTab("upcoming")
+              setCategoryFilter("") // Clear filters when switching tabs
+              setAccountFilter("")
+            }}
+            className={cn(
+              "px-6 py-3 font-semibold text-sm transition-all duration-200 border-b-2",
+              activeTab === "upcoming"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-600 hover:text-gray-900"
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Upcoming Payments
+            </div>
+          </button>
         </div>
 
         {/* Summary Cards */}
@@ -465,16 +526,18 @@ export default function ModernExpensesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <ModernCardTitle className="text-white text-lg">
-                    {activeTab === "general" ? "General Expenses" : "Personal Withdrawals"}
+                    {activeTab === "general" ? "General Expenses" : activeTab === "personal" ? "Personal Withdrawals" : "Upcoming Payments"}
                   </ModernCardTitle>
                   <p className="text-white/80 text-sm">
-                    {activeTab === "general" ? "Business costs" : "Team withdrawals"}
+                    {activeTab === "general" ? "Business costs" : activeTab === "personal" ? "Team withdrawals" : "Payment reminders"}
                   </p>
                 </div>
                 {activeTab === "general" ? (
                   <Receipt className="h-8 w-8 text-white/80" />
-                ) : (
+                ) : activeTab === "personal" ? (
                   <Wallet className="h-8 w-8 text-white/80" />
+                ) : (
+                  <Bell className="h-8 w-8 text-white/80" />
                 )}
               </div>
             </ModernCardHeader>
@@ -489,19 +552,25 @@ export default function ModernExpensesPage() {
             <ModernCardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <ModernCardTitle className="text-lg">Total {activeTab === "general" ? "General" : "Personal"}</ModernCardTitle>
-                  <p className="text-gray-600 text-sm">All time</p>
+                  <ModernCardTitle className="text-lg">
+                    {activeTab === "general" ? "Total General" : activeTab === "personal" ? "Total Personal" : "Total Upcoming"}
+                  </ModernCardTitle>
+                  <p className="text-gray-600 text-sm">
+                    {activeTab === "upcoming" ? "With reminders" : "All time"}
+                  </p>
                 </div>
                 {activeTab === "general" ? (
                   <Receipt className="h-8 w-8 text-blue-500" />
-                ) : (
+                ) : activeTab === "personal" ? (
                   <Wallet className="h-8 w-8 text-green-500" />
+                ) : (
+                  <Bell className="h-8 w-8 text-orange-500" />
                 )}
               </div>
             </ModernCardHeader>
             <ModernCardContent>
               <div className="text-2xl font-bold text-gray-900">
-                ₹{(activeTab === "general" ? generalExpenses : personalExpenses).toLocaleString()}
+                ₹{activeTab === "general" ? generalExpenses.toLocaleString() : activeTab === "personal" ? personalExpenses.toLocaleString() : upcomingExpenses.toLocaleString()}
               </div>
             </ModernCardContent>
           </ModernCard>
@@ -633,7 +702,7 @@ export default function ModernExpensesPage() {
             setShowAddForm(false)
             setEditingExpense(null)
             setFormData({
-              type: activeTab,
+              type: activeTab === "upcoming" ? "general" : activeTab,
               name: "",
               amount: "",
               date: new Date().toISOString().split("T")[0],
@@ -641,6 +710,8 @@ export default function ModernExpensesPage() {
               toUser: "",
               walletAccount: "",
               bankAccount: "",
+              reminder: "",
+              reminderDate: "",
               notes: "",
             })
             setErrors({})
@@ -808,6 +879,43 @@ export default function ModernExpensesPage() {
                 />
               </div>
 
+              {/* Reminder Section */}
+              <div className="space-y-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="enableReminder"
+                    checked={!!formData.reminder}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({ ...formData, reminder: "Payment reminder", reminderDate: "" })
+                      } else {
+                        setFormData({ ...formData, reminder: "", reminderDate: "" })
+                      }
+                    }}
+                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="enableReminder" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Set Payment Reminder
+                  </label>
+                </div>
+                {formData.reminder && (
+                  <div className="ml-8 space-y-2">
+                    <ModernInput
+                      label="Reminder Date"
+                      type="date"
+                      value={formData.reminderDate}
+                      onChange={(e) => setFormData({ ...formData, reminderDate: e.target.value })}
+                      icon={<Calendar className="h-4 w-4" />}
+                      min={new Date().toISOString().split("T")[0]}
+                    />
+                    <p className="text-xs text-gray-500">
+                      You'll receive a browser notification on this date to remind you about this payment.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <ModernInput
                 label="Notes"
                 value={formData.notes}
@@ -826,7 +934,7 @@ export default function ModernExpensesPage() {
                     setShowAddForm(false)
                     setEditingExpense(null)
                     setFormData({
-                      type: activeTab,
+                      type: activeTab === "upcoming" ? "general" : activeTab,
                       name: "",
                       amount: "",
                       date: new Date().toISOString().split("T")[0],
@@ -834,6 +942,8 @@ export default function ModernExpensesPage() {
                       toUser: "",
                       walletAccount: "",
                       bankAccount: "",
+                      reminder: "",
+                      reminderDate: "",
                       notes: "",
                     })
                     setErrors({})
@@ -904,19 +1014,27 @@ export default function ModernExpensesPage() {
           <ModernCardHeader>
             <div className="flex items-center justify-between">
               <ModernCardTitle className="text-xl">
-                {activeTab === "general" ? "General Expenses" : "Personal Withdrawals"}
+                {activeTab === "general" ? "General Expenses" : activeTab === "personal" ? "Personal Withdrawals" : "Upcoming Payments"}
               </ModernCardTitle>
               <ModernBadge variant="secondary">
-                {filteredExpenses.length} of {expenses.filter(e => e.type === activeTab).length}
+                {filteredExpenses.length} of {activeTab === "upcoming" ? expenses.filter(e => e.reminderDate).length : expenses.filter(e => e.type === activeTab).length}
               </ModernBadge>
             </div>
           </ModernCardHeader>
           <ModernCardContent className="p-0">
             {filteredExpenses.length === 0 ? (
               <div className="text-center py-12">
-                <Receipt className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">No expenses found</p>
-                <p className="text-gray-400">Try adjusting your filters or add a new expense</p>
+                {activeTab === "upcoming" ? (
+                  <Bell className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                ) : (
+                  <Receipt className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                )}
+                <p className="text-gray-500 text-lg">
+                  {activeTab === "upcoming" ? "No upcoming payments found" : "No expenses found"}
+                </p>
+                <p className="text-gray-400">
+                  {activeTab === "upcoming" ? "Set reminders on expenses to see them here" : "Try adjusting your filters or add a new expense"}
+                </p>
               </div>
             ) : (
               <ModernTable>
@@ -927,6 +1045,7 @@ export default function ModernExpensesPage() {
                     {activeTab === "personal" && <ModernTableHead>To Owner</ModernTableHead>}
                     <ModernTableHead>Amount</ModernTableHead>
                     <ModernTableHead>Date</ModernTableHead>
+                    {activeTab === "upcoming" && <ModernTableHead>Reminder Date</ModernTableHead>}
                     <ModernTableHead>Account</ModernTableHead>
                     <ModernTableHead>Created By</ModernTableHead>
                     <ModernTableHead className="text-right">Actions</ModernTableHead>
@@ -973,6 +1092,16 @@ export default function ModernExpensesPage() {
                           {formatDateDDMMYYYY(expense.date)}
                         </div>
                       </ModernTableCell>
+                      {activeTab === "upcoming" && (
+                        <ModernTableCell>
+                          <div className="flex items-center gap-2">
+                            <Bell className="h-4 w-4 text-orange-500" />
+                            <span className="text-sm font-medium text-orange-600">
+                              {expense.reminderDate ? formatDateDDMMYYYY(expense.reminderDate) : "—"}
+                            </span>
+                          </div>
+                        </ModernTableCell>
+                      )}
                       <ModernTableCell>
                         <div className="text-gray-600">
                           {getAccountName(expense.withdrawAccount)}

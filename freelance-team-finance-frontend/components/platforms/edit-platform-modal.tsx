@@ -15,6 +15,7 @@ interface Platform {
   url?: string
   description?: string
   commission?: number
+  chargePercentage?: number
 }
 
 interface EditPlatformModalProps {
@@ -28,9 +29,7 @@ export function EditPlatformModal({ platform, isOpen, onClose, onSuccess }: Edit
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
-    url: "",
-    description: "",
-    commission: "",
+    chargePercentage: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -38,9 +37,7 @@ export function EditPlatformModal({ platform, isOpen, onClose, onSuccess }: Edit
     if (isOpen && platform) {
       setFormData({
         name: platform.name,
-        url: platform.url || "",
-        description: platform.description || "",
-        commission: platform.commission?.toString() || "",
+        chargePercentage: platform.chargePercentage?.toString() || "",
       })
     }
   }, [isOpen, platform])
@@ -67,9 +64,7 @@ export function EditPlatformModal({ platform, isOpen, onClose, onSuccess }: Edit
     try {
       const platformData = {
         name: formData.name.trim(),
-        url: formData.url.trim() || undefined,
-        description: formData.description.trim() || undefined,
-        commission: formData.commission ? Number(formData.commission) : undefined,
+        chargePercentage: formData.chargePercentage ? Number(formData.chargePercentage) : undefined,
       }
 
       await apiClient.request(`/api/platforms/${platform._id}`, {
@@ -130,29 +125,14 @@ export function EditPlatformModal({ platform, isOpen, onClose, onSuccess }: Edit
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Website URL</label>
-              <Input name="url" value={formData.url} onChange={handleChange} placeholder="https://www.platform.com" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Commission (%)</label>
+              <label className="text-sm font-medium">Platform Charge (%) *</label>
               <Input
-                name="commission"
+                name="chargePercentage"
                 type="number"
                 step="0.01"
-                value={formData.commission}
+                value={formData.chargePercentage}
                 onChange={handleChange}
                 placeholder="e.g., 10"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Input
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Brief description of the platform"
               />
             </div>
 

@@ -14,6 +14,7 @@ const historyRoutes = require('./routes/history');
 const notificationsRoutes = require('./routes/notifications');
 const summaryRoutes = require('./routes/summary');
 const expenseReportsRoutes = require('./routes/expenseReports');
+const comprehensiveReportsRoutes = require('./routes/comprehensiveReports');
 const leadsRoutes = require('./routes/leads');
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/summary', summaryRoutes);
 app.use('/api/expense-reports', expenseReportsRoutes);
 app.use('/api/reports', require('./routes/report'));
+app.use('/api/comprehensive-reports', comprehensiveReportsRoutes);
 app.use('/api/leads', leadsRoutes);
 app.get('/health', (req, res) => res.status(200).send('api is healthy'));
 

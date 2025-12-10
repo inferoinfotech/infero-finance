@@ -28,7 +28,8 @@ import {
   Download,
   FileText,
   FileSpreadsheet,
-  Table
+  Table,
+  ArrowRightLeft
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
@@ -86,6 +87,15 @@ export default function ModernAccountsPage() {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [transferFormData, setTransferFormData] = useState({
+    walletId: "",
+    bankId: "",
+    amount: "",
+    conversionRate: "",
+  })
+  const [transferErrors, setTransferErrors] = useState<Record<string, string>>({})
 
   const {
     data: statement,
@@ -267,13 +277,31 @@ export default function ModernAccountsPage() {
               Manage your bank accounts and digital wallets in one place
             </p>
           </div>
-          <ModernButton onClick={() => {
-            setFormData({ type: activeTab, name: "", details: "" })
-            setShowAddForm(true)
-          }}>
-            <Plus className="h-4 w-4" />
-            Add Account
-          </ModernButton>
+          <div className="flex gap-3">
+            <ModernButton 
+              variant="outline"
+              onClick={() => {
+                setTransferFormData({
+                  walletId: "",
+                  bankId: "",
+                  amount: "",
+                  conversionRate: "",
+                })
+                setTransferErrors({})
+                setShowTransferModal(true)
+              }}
+            >
+              <ArrowRightLeft className="h-4 w-4 mr-2" />
+              Transfer Money
+            </ModernButton>
+            <ModernButton onClick={() => {
+              setFormData({ type: activeTab, name: "", details: "" })
+              setShowAddForm(true)
+            }}>
+              <Plus className="h-4 w-4" />
+              Add Account
+            </ModernButton>
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -745,6 +773,185 @@ export default function ModernAccountsPage() {
           }}
           onSuccess={handleEditSuccess}
         />
+
+        {/* Transfer Money Modal */}
+        <Dialog open={showTransferModal} onOpenChange={setShowTransferModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">Transfer Money</DialogTitle>
+              <p className="text-gray-600">Transfer money from wallet to bank account</p>
+            </DialogHeader>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              
+              // Validate form
+              const newErrors: Record<string, string> = {}
+              if (!transferFormData.walletId) newErrors.walletId = "Please select a wallet"
+              if (!transferFormData.bankId) newErrors.bankId = "Please select a bank account"
+              if (!transferFormData.amount || Number(transferFormData.amount) <= 0) {
+                newErrors.amount = "Amount must be greater than 0"
+              }
+              if (!transferFormData.conversionRate || Number(transferFormData.conversionRate) <= 0) {
+                newErrors.conversionRate = "Conversion rate must be greater than 0"
+              }
+              
+              setTransferErrors(newErrors)
+              if (Object.keys(newErrors).length > 0) return
+
+              setTransferring(true)
+              try {
+                const result = await apiClient.transferMoney({
+                  walletId: transferFormData.walletId,
+                  bankId: transferFormData.bankId,
+                  amount: Number(transferFormData.amount),
+                  conversionRate: Number(transferFormData.conversionRate),
+                })
+                
+                alert(`Successfully transferred ${transferFormData.amount} (${(Number(transferFormData.amount) * Number(transferFormData.conversionRate)).toLocaleString()} INR)`)
+                setShowTransferModal(false)
+                setTransferFormData({
+                  walletId: "",
+                  bankId: "",
+                  amount: "",
+                  conversionRate: "",
+                })
+                setTransferErrors({})
+                await fetchAccounts() // Refresh accounts to show updated balances
+              } catch (error: any) {
+                console.error("Transfer failed:", error)
+                let errorMessage = error?.message || error?.error || "Failed to transfer money. Please try again."
+                
+                // If error has details, show them
+                if (error?.details) {
+                  const details = error.details
+                  errorMessage += `\n\nFound ${details.foundPayments} on_hold payment(s).`
+                  if (details.paymentDetails && details.paymentDetails.length > 0) {
+                    errorMessage += `\nPayment breakdown:`
+                    details.paymentDetails.forEach((p: any, idx: number) => {
+                      errorMessage += `\n${idx + 1}. Amount: ${p.amount}, Charge: ${p.platformCharge}, Net: ${p.netAmount.toFixed(2)}${p.isSplit ? ' (split)' : ''}`
+                    })
+                  }
+                }
+                
+                setTransferErrors({ submit: errorMessage })
+              } finally {
+                setTransferring(false)
+              }
+            }} className="space-y-6">
+              {transferErrors.submit && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+                  {transferErrors.submit}
+                </div>
+              )}
+
+              <ModernSelect
+                label="From Wallet *"
+                value={transferFormData.walletId}
+                onChange={(e) => {
+                  setTransferFormData({ ...transferFormData, walletId: e.target.value })
+                  if (transferErrors.walletId) setTransferErrors({ ...transferErrors, walletId: "" })
+                }}
+                options={[
+                  { value: "", label: "Select Wallet" },
+                  ...accounts.filter(acc => acc.type === "wallet").map(acc => ({
+                    value: acc._id,
+                    label: `${acc.name} (Balance: ₹${(acc.balance || 0).toLocaleString()})`
+                  }))
+                ]}
+                error={transferErrors.walletId}
+              />
+
+              <ModernSelect
+                label="To Bank Account *"
+                value={transferFormData.bankId}
+                onChange={(e) => {
+                  setTransferFormData({ ...transferFormData, bankId: e.target.value })
+                  if (transferErrors.bankId) setTransferErrors({ ...transferErrors, bankId: "" })
+                }}
+                options={[
+                  { value: "", label: "Select Bank Account" },
+                  ...accounts.filter(acc => acc.type === "bank").map(acc => ({
+                    value: acc._id,
+                    label: `${acc.name} (Balance: ₹${(acc.balance || 0).toLocaleString()})`
+                  }))
+                ]}
+                error={transferErrors.bankId}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <ModernInput
+                  label="Amount (Original Currency) *"
+                  type="number"
+                  step="0.01"
+                  value={transferFormData.amount}
+                  onChange={(e) => {
+                    setTransferFormData({ ...transferFormData, amount: e.target.value })
+                    if (transferErrors.amount) setTransferErrors({ ...transferErrors, amount: "" })
+                  }}
+                  placeholder="e.g., 1000"
+                  icon={<DollarSign className="h-4 w-4" />}
+                  error={transferErrors.amount}
+                />
+
+                <ModernInput
+                  label="Conversion Rate *"
+                  type="number"
+                  step="0.01"
+                  value={transferFormData.conversionRate}
+                  onChange={(e) => {
+                    setTransferFormData({ ...transferFormData, conversionRate: e.target.value })
+                    if (transferErrors.conversionRate) setTransferErrors({ ...transferErrors, conversionRate: "" })
+                  }}
+                  placeholder="e.g., 83.5"
+                  icon={<DollarSign className="h-4 w-4" />}
+                  error={transferErrors.conversionRate}
+                />
+              </div>
+
+              {transferFormData.amount && transferFormData.conversionRate && (
+                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Amount in INR:</span>
+                    <span className="text-lg font-bold text-blue-600">
+                      ₹{(Number(transferFormData.amount) * Number(transferFormData.conversionRate)).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> This will automatically release on_hold payments from the selected wallet (oldest first) and transfer them to the bank account. If the amount exceeds a single payment, payments will be split as needed.
+                </p>
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <ModernButton type="submit" className="flex-1" loading={transferring} disabled={transferring}>
+                  Transfer Money
+                </ModernButton>
+                <ModernButton
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowTransferModal(false)
+                    setTransferFormData({
+                      walletId: "",
+                      bankId: "",
+                      amount: "",
+                      conversionRate: "",
+                    })
+                    setTransferErrors({})
+                  }}
+                  className="flex-1"
+                  disabled={transferring}
+                >
+                  Cancel
+                </ModernButton>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </ModernMainLayout>
   )

@@ -4,10 +4,13 @@ const { logHistory } = require('../utils/historyLogger');
 // Create new platform
 exports.createPlatform = async (req, res, next) => {
   try {
-    const { name } = req.body;
+    const { name, chargePercentage } = req.body;
     const exists = await Platform.findOne({ name: { $regex: `^${name}$`, $options: 'i' } });
     if (exists) return res.status(400).json({ error: 'Platform already exists' });
-    const platform = await Platform.create({ name });
+    const platform = await Platform.create({ 
+      name,
+      chargePercentage: chargePercentage ? Number(chargePercentage) : 0
+    });
 
     // Log platform creation (use req.user.userId if available, otherwise system)
     await logHistory({
@@ -35,19 +38,24 @@ exports.getPlatforms = async (req, res, next) => {
   }
 };
 
-// Update platform name
+// Update platform
 exports.updatePlatform = async (req, res, next) => {
   try {
     const { platformId } = req.params;
-    const { name } = req.body;
+    const { name, chargePercentage } = req.body;
     
     // Get old value
     const oldPlatform = await Platform.findById(platformId);
     if (!oldPlatform) return res.status(404).json({ error: 'Platform not found' });
     
+    const updateData = { name };
+    if (chargePercentage !== undefined) {
+      updateData.chargePercentage = Number(chargePercentage);
+    }
+    
     const updated = await Platform.findByIdAndUpdate(
       platformId,
-      { name },
+      updateData,
       { new: true }
     );
 

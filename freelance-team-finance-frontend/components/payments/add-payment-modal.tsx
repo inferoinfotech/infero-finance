@@ -24,6 +24,11 @@ interface Project {
   priceType: "fixed" | "hourly";
   hourlyRate?: number;
   currency: string;
+  platform?: {
+    _id: string;
+    name: string;
+    chargePercentage?: number;
+  } | string;
 }
 interface AddPaymentModalProps {
   projectId: string;
@@ -72,6 +77,7 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
         hoursBilled: "",
         hourlyWorkEntries: [],
       });
+      setPlatformChargeManuallyEdited(false);
     }
   }, [isOpen, project]);
 
@@ -113,6 +119,9 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
     }
   };
 
+  // Track if user manually edited the platform charge field
+  const [platformChargeManuallyEdited, setPlatformChargeManuallyEdited] = useState(false);
+
   // For hourly project: auto-fill Hours Billed & Amount
   useEffect(() => {
     if (project?.priceType === "hourly") {
@@ -121,14 +130,49 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
       );
       const hours = selectedWorks.reduce((acc, w) => acc + w.hours, 0);
       const rate = Number(project.hourlyRate) || 0;
+      const calculatedAmount = hours > 0 ? (hours * rate).toFixed(2) : "";
       setFormData(f => ({
         ...f,
         hoursBilled: hours > 0 ? hours.toString() : "",
-        amount: hours > 0 ? (hours * rate).toFixed(2) : "",
+        amount: calculatedAmount,
+      }));
+      
+      // Also auto-calculate platform charge when amount is auto-set for hourly projects
+      if (calculatedAmount && !platformChargeManuallyEdited) {
+        const platform = typeof project?.platform === 'object' ? project.platform : null;
+        const chargePercentage = platform?.chargePercentage;
+        if (chargePercentage && chargePercentage > 0) {
+          const calculatedCharge = (Number(calculatedAmount) * chargePercentage) / 100;
+          setFormData(f => ({
+            ...f,
+            platformCharge: calculatedCharge.toFixed(2),
+          }));
+        }
+      }
+    }
+    // eslint-disable-next-line
+  }, [formData.hourlyWorkEntries, project?.hourlyRate, hourlyWorkOptions, project?.platform, platformChargeManuallyEdited]);
+
+  // Auto-calculate platform charge when amount changes and platform has chargePercentage
+  
+  useEffect(() => {
+    const amount = Number(formData.amount) || 0;
+    const platform = typeof project?.platform === 'object' ? project.platform : null;
+    const chargePercentage = platform?.chargePercentage;
+    
+    // Auto-calculate if:
+    // 1. Amount is entered
+    // 2. Platform has chargePercentage
+    // 3. User hasn't manually edited the platform charge field
+    if (amount > 0 && chargePercentage && chargePercentage > 0 && !platformChargeManuallyEdited) {
+      const calculatedCharge = (amount * chargePercentage) / 100;
+      setFormData(f => ({
+        ...f,
+        platformCharge: calculatedCharge.toFixed(2),
       }));
     }
     // eslint-disable-next-line
-  }, [formData.hourlyWorkEntries, project?.hourlyRate, hourlyWorkOptions]);
+  }, [formData.amount, project?.platform, platformChargeManuallyEdited]);
 
   // Wallet/Bank status sync
   useEffect(() => {
@@ -227,6 +271,10 @@ export function AddPaymentModal({ projectId, isOpen, onClose, onSuccess }: AddPa
       setFormData(f => ({ ...f, [name]: selected }));
     } else {
       setFormData(f => ({ ...f, [name]: value }));
+      // Track if user manually edits platform charge
+      if (name === "platformCharge") {
+        setPlatformChargeManuallyEdited(true);
+      }
     }
     if (errors[name]) setErrors({ ...errors, [name]: "" });
   };

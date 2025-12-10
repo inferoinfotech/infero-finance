@@ -10,6 +10,7 @@ const expenseSchema = new mongoose.Schema({
   createdBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   toUser:          { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For personal expenses - which owner withdrew
   reminder:        { type: String },
+  reminderDate:     { type: Date }, // Date when reminder notification should be shown
   notes:           { type: String },
   createdAt:       { type: Date, default: Date.now }
 });

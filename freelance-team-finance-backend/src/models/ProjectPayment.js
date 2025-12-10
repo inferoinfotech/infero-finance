@@ -19,6 +19,9 @@ const projectPaymentSchema = new mongoose.Schema({
   hourlyWorkEntries: [{ type: mongoose.Schema.Types.ObjectId, ref: 'HourlyWork' }],
   paymentDate:       { type: Date, required: true },
   notes:             { type: String },
+  // For split payments (when transfer splits a payment)
+  isSplitPayment:    { type: Boolean, default: false }, // true if this is a split portion
+  parentPaymentId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ProjectPayment' }, // reference to original payment if split
   createdAt:         { type: Date, default: Date.now }
 });
 

@@ -13,5 +13,6 @@ router.get('/:accountId/statement', auth, allow('admin', 'owner'), accountContro
 router.get('/:accountId/statement/export/csv', auth, allow('admin', 'owner'), accountController.exportStatementCSV);
 router.get('/:accountId/statement/export/excel', auth, allow('admin', 'owner'), accountController.exportStatementExcel);
 router.get('/:accountId/statement/export/pdf', auth, allow('admin', 'owner'), accountController.exportStatementPDF);
+router.post('/transfer', auth, allow('admin', 'owner'), accountController.transferMoney);
 
 module.exports = router;

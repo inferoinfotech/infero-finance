@@ -6,10 +6,10 @@ const { logHistory } = require('../utils/historyLogger');
 // Add expense (general or personal)
 exports.createExpense = async (req, res, next) => {
   try {
-    const { type, name, amount, date, category, withdrawAccount, toUser, reminder, notes } = req.body;
+    const { type, name, amount, date, category, withdrawAccount, toUser, reminder, reminderDate, notes } = req.body;
 
     const expense = await Expense.create({
-      type, name, amount, date, category, withdrawAccount, toUser, reminder, notes,
+      type, name, amount, date, category, withdrawAccount, toUser, reminder, reminderDate, notes,
       createdBy: req.user.userId
     });
 

@@ -47,7 +47,7 @@ exports.createProject = async (req, res, next) => {
 exports.getProjects = async (req, res, next) => {
   try {
     const projects = await Project.find({ createdBy: req.user.userId })
-      .populate('platform', 'name')
+      .populate('platform', 'name chargePercentage')
       .sort({ createdAt: -1 });
     res.json({ projects });
   } catch (err) {
@@ -60,7 +60,7 @@ exports.getProjectById = async (req, res, next) => {
   try {
     const { projectId } = req.params;
     const project = await Project.findOne({ _id: projectId, createdBy: req.user.userId })
-      .populate('platform', 'name');
+      .populate('platform', 'name chargePercentage');
     if (!project) return res.status(404).json({ error: 'Project not found' });
     res.json({ project });
   } catch (err) {

@@ -26,6 +26,7 @@ interface Platform {
   url?: string
   description?: string
   commission?: number
+  chargePercentage?: number
 }
 
 export default function ModernPlatformsPage() {
@@ -35,9 +36,7 @@ export default function ModernPlatformsPage() {
   const [editingPlatform, setEditingPlatform] = useState<Platform | null>(null)
   const [formData, setFormData] = useState({
     name: "",
-    url: "",
-    description: "",
-    commission: "",
+    chargePercentage: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -66,11 +65,8 @@ export default function ModernPlatformsPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     if (!formData.name.trim()) newErrors.name = "Platform name is required"
-    if (formData.url && !formData.url.startsWith('http')) {
-      newErrors.url = "Please enter a valid URL starting with http:// or https://"
-    }
-    if (formData.commission && (Number(formData.commission) < 0 || Number(formData.commission) > 100)) {
-      newErrors.commission = "Commission must be between 0 and 100"
+    if (formData.chargePercentage && (Number(formData.chargePercentage) < 0 || Number(formData.chargePercentage) > 100)) {
+      newErrors.chargePercentage = "Platform charge percentage must be between 0 and 100"
     }
     
     setErrors(newErrors)
@@ -84,9 +80,7 @@ export default function ModernPlatformsPage() {
     try {
       const platformData = {
         name: formData.name.trim(),
-        url: formData.url.trim() || undefined,
-        description: formData.description.trim() || undefined,
-        commission: formData.commission ? Number(formData.commission) : undefined,
+        chargePercentage: formData.chargePercentage ? Number(formData.chargePercentage) : undefined,
       }
 
       if (editingPlatform) {
@@ -100,7 +94,7 @@ export default function ModernPlatformsPage() {
 
       setShowAddForm(false)
       setEditingPlatform(null)
-      setFormData({ name: "", url: "", description: "", commission: "" })
+      setFormData({ name: "", chargePercentage: "" })
       setErrors({})
       fetchPlatforms()
     } catch (error) {
@@ -113,9 +107,7 @@ export default function ModernPlatformsPage() {
     setEditingPlatform(platform)
     setFormData({
       name: platform.name,
-      url: platform.url || "",
-      description: platform.description || "",
-      commission: platform.commission?.toString() || "",
+      chargePercentage: platform.chargePercentage?.toString() || "",
     })
     setShowAddForm(true)
   }
@@ -134,7 +126,7 @@ export default function ModernPlatformsPage() {
   const closeModal = () => {
     setShowAddForm(false)
     setEditingPlatform(null)
-    setFormData({ name: "", url: "", description: "", commission: "" })
+    setFormData({ name: "", chargePercentage: "" })
     setErrors({})
   }
 
@@ -246,7 +238,7 @@ export default function ModernPlatformsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <ModernInput
-                  label="Platform Name"
+                  label="Platform Name *"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Upwork, Fiverr, Freelancer"
@@ -255,33 +247,16 @@ export default function ModernPlatformsPage() {
                 />
 
                 <ModernInput
-                  label="Website URL"
-                  value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  placeholder="https://www.platform.com"
-                  icon={<Globe className="h-4 w-4" />}
-                  error={errors.url}
-                />
-
-                <ModernInput
-                  label="Commission Rate (%)"
+                  label="Platform Charge (%) *"
                   type="number"
                   step="0.01"
-                  value={formData.commission}
-                  onChange={(e) => setFormData({ ...formData, commission: e.target.value })}
+                  value={formData.chargePercentage}
+                  onChange={(e) => setFormData({ ...formData, chargePercentage: e.target.value })}
                   placeholder="e.g., 10"
                   icon={<Percent className="h-4 w-4" />}
-                  error={errors.commission}
+                  error={errors.chargePercentage}
                 />
               </div>
-
-              <ModernInput
-                label="Description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Brief description of the platform"
-                icon={<FileText className="h-4 w-4" />}
-              />
 
               <div className="flex gap-4 pt-4">
                 <ModernButton type="submit" className="flex-1">

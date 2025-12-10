@@ -53,9 +53,9 @@ export function ModernSidebar() {
   const items = itemsForRole(user?.role)
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-white/10">
+      <div className="p-6 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
             <span className="text-white font-bold text-lg">I</span>
@@ -70,7 +70,7 @@ export function ModernSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {items.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -109,7 +109,7 @@ export function ModernSidebar() {
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 flex-shrink-0">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/10 backdrop-blur-sm">
           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
             {user?.name?.charAt(0)?.toUpperCase()}
@@ -171,7 +171,8 @@ export function ModernSidebar() {
       {/* Desktop Sidebar */}
       <div className={`
         hidden lg:flex flex-col bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 text-white
-        transition-all duration-300 ease-in-out relative
+        transition-all duration-300 ease-in-out
+        sticky top-0 h-screen z-40 flex-shrink-0
         ${isCollapsed ? 'w-20' : 'w-80'}
       `}>
         {/* Collapse Toggle */}

@@ -249,7 +249,7 @@ export default function ModernHistoryPage() {
               </ModernBadge>
             </div>
           </ModernCardHeader>
-          <ModernCardContent>
+          <ModernCardContent className="p-0">
             {filteredHistory.length === 0 ? (
               <div className="text-center py-12">
                 <HistoryIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -257,71 +257,84 @@ export default function ModernHistoryPage() {
                 <p className="text-gray-400">Try adjusting your filters</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                {filteredHistory.map((entry) => (
-                  <div key={entry._id} className="relative">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                        {getActionIcon(entry.action)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <ModernBadge variant={getActionColor(entry.action)}>
-                            {entry.action.toUpperCase()}
-                          </ModernBadge>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            {getEntityIcon(entry.entity)}
-                            <span className="font-medium capitalize">{entry.entity}</span>
-                          </div>
+              <div className="max-h-[70vh] overflow-y-auto">
+                <div className="p-6 space-y-4">
+                  {filteredHistory.map((entry, index) => (
+                    <div 
+                      key={entry._id} 
+                      className={`
+                        relative border-l-4 pl-6 pb-6
+                        ${index < filteredHistory.length - 1 ? 'border-b border-gray-200' : ''}
+                        ${entry.action === 'create' ? 'border-l-green-500' : ''}
+                        ${entry.action === 'update' ? 'border-l-blue-500' : ''}
+                        ${entry.action === 'delete' ? 'border-l-red-500' : ''}
+                        ${entry.action === 'login' ? 'border-l-purple-500' : ''}
+                        ${!['create', 'update', 'delete', 'login'].includes(entry.action) ? 'border-l-gray-400' : ''}
+                      `}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-md">
+                          {getActionIcon(entry.action)}
                         </div>
-
-                        <p className="text-gray-800 font-medium mb-2">{entry.description}</p>
-
-                        <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            <span>{entry.user.name}</span>
-                            <span className="text-gray-400">({entry.user.email})</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            <span>{formatDateTimeDDMMYYYY(entry.timestamp)}</span>
-                          </div>
-                        </div>
-
-                        {entry.changes && Object.keys(entry.changes).length > 0 && (
-                          <details className="group/details">
-                            <summary className="cursor-pointer text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
-                              <Eye className="h-3 w-3" />
-                              View Changes
-                              <span className="text-xs text-gray-400 ml-1">
-                                ({Object.keys(entry.changes).length} fields changed)
-                              </span>
-                            </summary>
-                            <div className="mt-3 p-4 bg-gray-50 rounded-xl border">
-                              <div className="space-y-2">
-                                {Object.entries(entry.changes).map(([key, change]: [string, any]) => (
-                                  <div key={key} className="text-xs">
-                                    <span className="font-semibold text-gray-700 capitalize">{key}:</span>
-                                    {'old' in change && (
-                                      <span className="text-red-600 ml-2">"{String(change.old)}"</span>
-                                    )}
-                                    {'old' in change && 'new' in change && (
-                                      <span className="mx-2 text-gray-400">→</span>
-                                    )}
-                                    {'new' in change && (
-                                      <span className="text-green-600">"{String(change.new)}"</span>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-3">
+                            <ModernBadge variant={getActionColor(entry.action)}>
+                              {entry.action.toUpperCase()}
+                            </ModernBadge>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              {getEntityIcon(entry.entity)}
+                              <span className="font-medium capitalize">{entry.entity}</span>
                             </div>
-                          </details>
-                        )}
+                          </div>
+
+                          <p className="text-gray-800 font-medium mb-3 leading-relaxed">{entry.description}</p>
+
+                          <div className="flex items-center gap-4 text-sm text-gray-500 mb-3 pb-3 border-b border-gray-100">
+                            <div className="flex items-center gap-1">
+                              <User className="h-4 w-4" />
+                              <span className="font-medium">{entry.user.name}</span>
+                              <span className="text-gray-400">({entry.user.email})</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{formatDateTimeDDMMYYYY(entry.timestamp)}</span>
+                            </div>
+                          </div>
+
+                          {entry.changes && Object.keys(entry.changes).length > 0 && (
+                            <details className="group/details">
+                              <summary className="cursor-pointer text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1 mb-2">
+                                <Eye className="h-3 w-3" />
+                                View Changes
+                                <span className="text-xs text-gray-400 ml-1">
+                                  ({Object.keys(entry.changes).length} fields changed)
+                                </span>
+                              </summary>
+                              <div className="mt-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                <div className="space-y-2">
+                                  {Object.entries(entry.changes).map(([key, change]: [string, any]) => (
+                                    <div key={key} className="text-xs py-1 border-b border-gray-100 last:border-0">
+                                      <span className="font-semibold text-gray-700 capitalize">{key}:</span>
+                                      {'old' in change && (
+                                        <span className="text-red-600 ml-2">"{String(change.old)}"</span>
+                                      )}
+                                      {'old' in change && 'new' in change && (
+                                        <span className="mx-2 text-gray-400">→</span>
+                                      )}
+                                      {'new' in change && (
+                                        <span className="text-green-600">"{String(change.new)}"</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </details>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </ModernCardContent>

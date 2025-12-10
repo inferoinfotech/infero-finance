@@ -1,9 +1,13 @@
 const Account = require('../models/Account');
 const AccountTxn = require('../models/AccountTxn');
+const ProjectPayment = require('../models/ProjectPayment');
+const Project = require('../models/Project');
 const { logHistory } = require('../utils/historyLogger');
+const { postAccountTxn } = require('../utils/ledger');
 const { Parser } = require('json2csv');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
+const mongoose = require('mongoose');
 
 // Add new account (bank or wallet)
 exports.createAccount = async (req, res, next) => {
@@ -365,6 +369,349 @@ exports.exportStatementPDF = async (req, res, next) => {
 
     doc.end();
   } catch (err) {
+    next(err);
+  }
+};
+
+// Helper function to check if MongoDB supports transactions
+async function supportsTransactions() {
+  try {
+    const conn = mongoose.connection;
+    const hello = await conn.db.admin().command({ hello: 1 });
+    return Boolean(hello.setName);
+  } catch {
+    return false;
+  }
+}
+
+// Transfer money from wallet to bank
+exports.transferMoney = async (req, res, next) => {
+  const useTx = await supportsTransactions();
+  let session = null;
+  
+  try {
+    if (useTx) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    }
+    const { walletId, bankId, amount, conversionRate } = req.body;
+    
+    // Validate inputs
+    if (!walletId || !bankId || !amount || !conversionRate) {
+      if (session) await session.abortTransaction();
+      return res.status(400).json({ error: 'Missing required fields: walletId, bankId, amount, conversionRate' });
+    }
+
+    const walletAmount = Number(amount);
+    const rate = Number(conversionRate);
+    const amountInINR = walletAmount * rate;
+    const opts = session ? { session } : {};
+
+    // Verify accounts exist and belong to user
+    const walletQuery = Account.findOne({ _id: walletId, user: req.user.userId, type: 'wallet' });
+    const bankQuery = Account.findOne({ _id: bankId, user: req.user.userId, type: 'bank' });
+    const wallet = session ? await walletQuery.session(session) : await walletQuery;
+    const bank = session ? await bankQuery.session(session) : await bankQuery;
+    
+    if (!wallet) {
+      if (session) await session.abortTransaction();
+      return res.status(404).json({ error: 'Wallet account not found' });
+    }
+    if (!bank) {
+      if (session) await session.abortTransaction();
+      return res.status(404).json({ error: 'Bank account not found' });
+    }
+
+    // Find all on_hold payments for this wallet, sorted by createdAt (oldest first)
+    // Include both original and split payments that are still on_hold
+    const onHoldPaymentsQuery = ProjectPayment.find({
+      platformWallet: walletId,
+      walletStatus: 'on_hold'
+      // Note: We include split payments too, as they can still be on_hold after a partial transfer
+    }).sort({ createdAt: 1 }); // Oldest first
+    
+    const onHoldPayments = session 
+      ? await onHoldPaymentsQuery.session(session)
+      : await onHoldPaymentsQuery;
+
+    // Calculate total available amount (in original currency)
+    let totalAvailable = 0;
+    const paymentDetails = [];
+    for (const payment of onHoldPayments) {
+      const netAmount = payment.amount - (payment.platformCharge || 0);
+      totalAvailable += netAmount;
+      paymentDetails.push({
+        id: payment._id,
+        amount: payment.amount,
+        platformCharge: payment.platformCharge || 0,
+        netAmount: netAmount,
+        isSplit: payment.isSplitPayment || false
+      });
+    }
+
+    if (totalAvailable < walletAmount) {
+      if (session) await session.abortTransaction();
+      return res.status(400).json({ 
+        error: `Insufficient on_hold balance. Available: ${totalAvailable.toFixed(2)}, Requested: ${walletAmount.toFixed(2)}`,
+        details: {
+          foundPayments: onHoldPayments.length,
+          paymentDetails: paymentDetails,
+          totalAvailable: totalAvailable.toFixed(2)
+        }
+      });
+    }
+
+    // Process payments in order until we reach the transfer amount
+    let remainingToTransfer = walletAmount;
+    const processedPayments = [];
+    let splitPayment = null;
+
+    for (const payment of onHoldPayments) {
+      if (remainingToTransfer <= 0) break;
+
+      const netAmount = payment.amount - (payment.platformCharge || 0);
+      const project = session 
+        ? await Project.findById(payment.project).session(session)
+        : await Project.findById(payment.project);
+      
+      if (!project) continue;
+
+      if (netAmount <= remainingToTransfer) {
+        // Release full payment
+        const oldAmountInINR = payment.amountInINR;
+        const newAmountInINR = netAmount * rate;
+        
+        // Adjust wallet balance if rate changed
+        if (newAmountInINR !== oldAmountInINR && walletId) {
+          const adjustment = newAmountInINR - oldAmountInINR;
+          if (adjustment !== 0) {
+            await postAccountTxn({
+              userId: req.user.userId,
+              accountId: walletId,
+              type: adjustment > 0 ? 'credit' : 'debit',
+              amount: Math.abs(adjustment),
+              refType: 'transfer',
+              refId: payment._id,
+              remark: `Rate adjustment before transfer (payment ${payment._id})`
+            }, session);
+          }
+        }
+
+        // Update payment: release and set bank account
+        payment.walletStatus = 'released';
+        payment.bankStatus = 'received';
+        payment.bankAccount = bankId;
+        payment.conversionRate = rate; // Update to new rate
+        payment.amountInINR = newAmountInINR;
+        payment.bankTransferDate = new Date();
+        await payment.save(opts);
+
+        // Deduct from wallet and add to bank
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: walletId,
+          type: 'debit',
+          amount: newAmountInINR,
+          refType: 'transfer',
+          refId: payment._id,
+          remark: `Transfer to bank (payment ${payment._id})`
+        }, session);
+
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: bankId,
+          type: 'credit',
+          amount: newAmountInINR,
+          refType: 'transfer',
+          refId: payment._id,
+          remark: `Received from wallet (payment ${payment._id})`
+        }, session);
+
+        processedPayments.push(payment._id);
+        remainingToTransfer -= netAmount;
+      } else {
+        // Need to split this payment
+        const releaseAmount = remainingToTransfer;
+        const keepAmount = netAmount - releaseAmount;
+        const platformCharge = payment.platformCharge || 0;
+        
+        // Calculate proportional platform charge
+        const releasePlatformCharge = (platformCharge * releaseAmount) / netAmount;
+        const keepPlatformCharge = platformCharge - releasePlatformCharge;
+
+        // Update original payment to keep the remaining amount
+        const oldAmountInINR = payment.amountInINR;
+        const keepAmountInINR = keepAmount * payment.conversionRate; // Keep original rate for on_hold portion
+        payment.amount = keepAmount + keepPlatformCharge;
+        payment.platformCharge = keepPlatformCharge;
+        payment.amountInINR = keepAmountInINR;
+        await payment.save(opts);
+
+        // When splitting, we need to:
+        // 1. Reverse the original credit (debit oldAmountInINR)
+        // 2. Credit back the kept portion (credit keepAmountInINR)
+        // 3. For released portion: handle rate adjustment and debit it
+        
+        // Step 1: Reverse the original credit
+        if (walletId) {
+          await postAccountTxn({
+            userId: req.user.userId,
+            accountId: walletId,
+            type: 'debit',
+            amount: oldAmountInINR,
+            refType: 'transfer',
+            refId: payment._id,
+            remark: `Reverse original payment credit for split (payment ${payment._id})`
+          }, session);
+        }
+
+        // Step 2: Credit back the kept portion
+        if (walletId) {
+          await postAccountTxn({
+            userId: req.user.userId,
+            accountId: walletId,
+            type: 'credit',
+            amount: keepAmountInINR,
+            refType: 'transfer',
+            refId: payment._id,
+            remark: `Credit kept portion after split (payment ${payment._id})`
+          }, session);
+        }
+
+        // Create new payment entry for released portion
+        const oldReleasedAmountInINR = releaseAmount * payment.conversionRate; // At original rate
+        const releasedAmountInINR = releaseAmount * rate; // At new rate
+        const splitPaymentDoc = {
+          project: payment.project,
+          amount: releaseAmount + releasePlatformCharge,
+          platformCharge: releasePlatformCharge,
+          conversionRate: rate, // New rate for released portion
+          amountInINR: releasedAmountInINR,
+          platformWallet: walletId,
+          walletStatus: 'released',
+          walletReceivedDate: payment.walletReceivedDate,
+          bankAccount: bankId,
+          bankStatus: 'received',
+          bankTransferDate: new Date(),
+          paymentDate: payment.paymentDate,
+          notes: payment.notes ? `${payment.notes} (Split from payment ${payment._id})` : `Split from payment ${payment._id}`,
+          isSplitPayment: true,
+          parentPaymentId: payment._id,
+          hoursBilled: payment.hoursBilled ? (payment.hoursBilled * releaseAmount) / netAmount : undefined,
+          hourlyWorkEntries: [] // Don't copy hourly work entries for split
+        };
+
+        splitPayment = session 
+          ? (await ProjectPayment.create([splitPaymentDoc], { session }))[0]
+          : await ProjectPayment.create(splitPaymentDoc);
+
+        // The wallet was already credited with oldReleasedAmountInINR (as part of original payment)
+        // Now we need to:
+        // 1. Adjust for rate change (if rate changed)
+        // 2. Debit the released amount from wallet (at new rate)
+        // 3. Credit to bank (at new rate)
+        
+        // First, adjust wallet if rate changed
+        if (releasedAmountInINR !== oldReleasedAmountInINR && walletId) {
+          const rateAdjustment = releasedAmountInINR - oldReleasedAmountInINR;
+          if (rateAdjustment !== 0) {
+            await postAccountTxn({
+              userId: req.user.userId,
+              accountId: walletId,
+              type: rateAdjustment > 0 ? 'credit' : 'debit',
+              amount: Math.abs(rateAdjustment),
+              refType: 'transfer',
+              refId: splitPayment._id,
+              remark: `Rate adjustment for split payment (payment ${splitPayment._id})`
+            }, session);
+          }
+        }
+
+        // Step 3c: For released portion - we need to credit it back at old rate first
+        // (since we reversed the full original credit), then debit at new rate
+        if (walletId) {
+          // Credit released portion at old rate (to restore what was originally credited)
+          await postAccountTxn({
+            userId: req.user.userId,
+            accountId: walletId,
+            type: 'credit',
+            amount: oldReleasedAmountInINR,
+            refType: 'transfer',
+            refId: splitPayment._id,
+            remark: `Credit released portion at old rate (payment ${splitPayment._id})`
+          }, session);
+        }
+        
+        // Now debit the released amount from wallet (at new rate) and credit to bank
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: walletId,
+          type: 'debit',
+          amount: releasedAmountInINR,
+          refType: 'transfer',
+          refId: splitPayment._id,
+          remark: `Transfer to bank (split payment ${splitPayment._id})`
+        }, session);
+
+        await postAccountTxn({
+          userId: req.user.userId,
+          accountId: bankId,
+          type: 'credit',
+          amount: releasedAmountInINR,
+          refType: 'transfer',
+          refId: splitPayment._id,
+          remark: `Received from wallet (split payment ${splitPayment._id})`
+        }, session);
+
+        processedPayments.push(splitPayment._id);
+        remainingToTransfer = 0;
+        break;
+      }
+    }
+
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+    }
+
+    // Log transfer
+    await logHistory({
+      userId: req.user.userId,
+      action: 'transfer',
+      entityType: 'Account',
+      entityId: walletId,
+      newValue: {
+        walletId,
+        bankId,
+        amount: walletAmount,
+        conversionRate: rate,
+        amountInINR,
+        processedPayments: processedPayments.length,
+        splitPayment: splitPayment ? splitPayment._id : null
+      },
+      description: `Transferred ${walletAmount} (${amountInINR} INR) from ${wallet.name} to ${bank.name}`
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully transferred ${walletAmount} (${amountInINR} INR)`,
+      transfer: {
+        walletId,
+        bankId,
+        amount: walletAmount,
+        conversionRate: rate,
+        amountInINR,
+        processedPayments: processedPayments.length,
+        splitPayment: splitPayment ? splitPayment._id : null
+      }
+    });
+  } catch (err) {
+    if (session) {
+      try {
+        await session.abortTransaction();
+        session.endSession();
+      } catch {}
+    }
     next(err);
   }
 };

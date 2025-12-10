@@ -20,7 +20,11 @@ class ApiClient {
       const response = await fetch(url, config)
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }))
+        const error = new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`)
+        ;(error as any).error = errorData.error || errorData.message
+        ;(error as any).details = errorData.details // Pass through details for better error messages
+        throw error
       }
 
       return await response.json()
@@ -143,6 +147,13 @@ class ApiClient {
     // Returns shape like:
     // { account: {...}, txns: [ ... ] }
     return this.request(`/api/accounts/${accountId}/statement`)
+  }
+
+  async transferMoney(transferData: { walletId: string; bankId: string; amount: number; conversionRate: number }) {
+    return this.request("/api/accounts/transfer", {
+      method: "POST",
+      body: JSON.stringify(transferData),
+    })
   }
 
   // Platforms endpoints
