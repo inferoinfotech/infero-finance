@@ -55,16 +55,20 @@ export function ModernSidebar() {
   const SidebarContent = () => (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="p-6 border-b border-white/10 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">I</span>
-          </div>
-          {!isCollapsed && (
-            <div>
-              <h2 className="text-white font-bold text-lg">Infero</h2>
-              <p className="text-white/70 text-xs">Infotech Solutions</p>
-            </div>
+      <div className={`border-b border-white/10 flex-shrink-0 ${isCollapsed ? 'p-4' : 'p-6'}`}>
+        <div className="flex items-center justify-center">
+          {isCollapsed ? (
+            <img 
+              src="/logo.png" 
+              alt="Infero Logo" 
+              className="w-16 h-16 object-contain"
+            />
+          ) : (
+            <img 
+              src="/logo.png" 
+              alt="Infero Infotech Solutions" 
+              className="h-16 w-auto object-contain max-w-full"
+            />
           )}
         </div>
       </div>

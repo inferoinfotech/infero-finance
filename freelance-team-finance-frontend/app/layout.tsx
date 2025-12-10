@@ -9,6 +9,10 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Freelancing Management System",
   description: "Team-based freelancing management platform",
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
