@@ -100,6 +100,87 @@ export default function ModernDashboardPage() {
     return { bankTotal: bank, walletTotal: wallet, grandTotal: bank + wallet }
   }, [accounts])
 
+  // Totals for income / expenses
+  const totalIncome = useMemo(
+    () => income.reduce((sum, item) => sum + (item.total || 0), 0),
+    [income]
+  )
+  const totalExpenses = useMemo(
+    () => expenses.reduce((sum, item) => sum + (item.total || 0), 0),
+    [expenses]
+  )
+  const totalGeneralExpenses = useMemo(
+    () => general.reduce((sum, item) => sum + (item.total || 0), 0),
+    [general]
+  )
+  const revenue = useMemo(
+    () => totalIncome - totalGeneralExpenses,
+    [totalIncome, totalGeneralExpenses]
+  )
+
+  // Combined monthly series for charts
+  const incomeVsAllExpensesData = useMemo(() => {
+    const map = new Map<
+      string,
+      { month: string; label: string; income: number; expenses: number }
+    >()
+
+    income.forEach((d) => {
+      const existing = map.get(d.month) || {
+        month: d.month,
+        label: monthLabel(d.month),
+        income: 0,
+        expenses: 0,
+      }
+      existing.income += d.total || 0
+      map.set(d.month, existing)
+    })
+
+    expenses.forEach((d) => {
+      const existing = map.get(d.month) || {
+        month: d.month,
+        label: monthLabel(d.month),
+        income: 0,
+        expenses: 0,
+      }
+      existing.expenses += d.total || 0
+      map.set(d.month, existing)
+    })
+
+    return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month))
+  }, [income, expenses])
+
+  const incomeVsGeneralExpensesData = useMemo(() => {
+    const map = new Map<
+      string,
+      { month: string; label: string; income: number; generalExpenses: number }
+    >()
+
+    income.forEach((d) => {
+      const existing = map.get(d.month) || {
+        month: d.month,
+        label: monthLabel(d.month),
+        income: 0,
+        generalExpenses: 0,
+      }
+      existing.income += d.total || 0
+      map.set(d.month, existing)
+    })
+
+    general.forEach((d) => {
+      const existing = map.get(d.month) || {
+        month: d.month,
+        label: monthLabel(d.month),
+        income: 0,
+        generalExpenses: 0,
+      }
+      existing.generalExpenses += d.total || 0
+      map.set(d.month, existing)
+    })
+
+    return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month))
+  }, [income, general])
+
   const loading = isAdminOwner && (accountsLoading || incomeLoading || expensesLoading || generalLoading)
 
   // Sample pie chart data
@@ -168,35 +249,63 @@ export default function ModernDashboardPage() {
           </div>
 
           {/* Key Performance Indicators */}
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard
-              title="Total Balance"
-              value={currency(grandTotal)}
-              subtitle="All accounts combined"
-              icon={<IndianRupee className="w-6 h-6" />}
-              variant="gradient"
-              trend={{ value: 12.5, isPositive: true }}
-            />
-            <StatCard
-              title="Bank Balance"
-              value={currency(bankTotal)}
-              subtitle="Available in banks"
-              icon={<CreditCard className="w-6 h-6" />}
-              trend={{ value: 8.2, isPositive: true }}
-            />
-            <StatCard
-              title="Wallet Balance"
-              value={currency(walletTotal)}
-              subtitle="Digital wallets"
-              icon={<Wallet className="w-6 h-6" />}
-              trend={{ value: 15.3, isPositive: true }}
-            />
-            <StatCard
-              title="Active Accounts"
-              value={accounts.length}
-              subtitle="Total accounts"
-              icon={<Award className="w-6 h-6" />}
-            />
+          <section className="space-y-6">
+            {/* First row: balances */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <StatCard
+                title="Total Balance"
+                value={currency(grandTotal)}
+                subtitle="All accounts combined"
+                icon={<IndianRupee className="w-6 h-6" />}
+                variant="gradient"
+                trend={{ value: 12.5, isPositive: true }}
+              />
+              <StatCard
+                title="Bank Balance"
+                value={currency(bankTotal)}
+                subtitle="Available in banks"
+                icon={<CreditCard className="w-6 h-6" />}
+                trend={{ value: 8.2, isPositive: true }}
+              />
+              <StatCard
+                title="Wallet Balance"
+                value={currency(walletTotal)}
+                subtitle="Digital wallets"
+                icon={<Wallet className="w-6 h-6" />}
+                trend={{ value: 15.3, isPositive: true }}
+              />
+            </div>
+
+            {/* Second row: income / expenses / revenue */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatCard
+                title="Total Income"
+                value={currency(totalIncome)}
+                subtitle="All recorded income"
+                icon={<TrendingUp className="w-6 h-6 text-green-600" />}
+                trend={{ value: 10.2, isPositive: true }}
+              />
+              <StatCard
+                title="Total Expenses"
+                value={currency(totalExpenses)}
+                subtitle="All expense types"
+                icon={<TrendingDown className="w-6 h-6 text-red-600" />}
+                trend={{ value: 6.4, isPositive: false }}
+              />
+              <StatCard
+                title="Total General Expenses"
+                value={currency(totalGeneralExpenses)}
+                subtitle="Only general expenses"
+                icon={<Layers className="w-6 h-6 text-blue-600" />}
+              />
+              <StatCard
+                title="Revenue"
+                value={currency(revenue)}
+                subtitle="Income - General Expenses"
+                icon={<IndianRupee className="w-6 h-6 text-emerald-600" />}
+                variant={revenue >= 0 ? "success" : "destructive"}
+              />
+            </div>
           </section>
 
           {/* Accounts Overview */}
@@ -313,8 +422,117 @@ export default function ModernDashboardPage() {
                 <p className="text-gray-600">Monthly performance and insights</p>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+            <div className="space-y-6">
+              {/* Combined income vs expenses charts */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* Income vs All Expenses */}
+                <ModernCard>
+                  <ModernCardHeader className="flex flex-row items-center justify-between pb-2">
+                    <div>
+                      <ModernCardTitle className="text-base">Income vs All Expenses</ModernCardTitle>
+                      <p className="text-sm text-gray-600">Monthly income and all expense types</p>
+                    </div>
+                    <TrendingUp className="h-5 w-5 text-purple-600" />
+                  </ModernCardHeader>
+                  <ModernCardContent>
+                    {incomeError || expensesError ? (
+                      <div className="text-sm text-red-600 text-center py-8">
+                        Failed to load income or expenses data
+                      </div>
+                    ) : (
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={incomeVsAllExpensesData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                            <YAxis tick={{ fontSize: 10 }} />
+                            <Tooltip
+                              formatter={(v: any, name: any) => [
+                                currency(v),
+                                name === "income" ? "Income" : "Expenses",
+                              ]}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="income"
+                              name="Income"
+                              stroke="#10B981"
+                              strokeWidth={3}
+                              dot={{ fill: "#10B981", strokeWidth: 2, r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="expenses"
+                              name="Expenses"
+                              stroke="#EF4444"
+                              strokeWidth={3}
+                              dot={{ fill: "#EF4444", strokeWidth: 2, r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </ModernCardContent>
+                </ModernCard>
+
+                {/* Income vs General Expenses */}
+                <ModernCard>
+                  <ModernCardHeader className="flex flex-row items-center justify-between pb-2">
+                    <div>
+                      <ModernCardTitle className="text-base">Income vs General Expenses</ModernCardTitle>
+                      <p className="text-sm text-gray-600">Monthly income and only general expenses</p>
+                    </div>
+                    <Layers className="h-5 w-5 text-indigo-600" />
+                  </ModernCardHeader>
+                  <ModernCardContent>
+                    {incomeError || generalError ? (
+                      <div className="text-sm text-red-600 text-center py-8">
+                        Failed to load income or general expenses data
+                      </div>
+                    ) : (
+                      <div className="h-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={incomeVsGeneralExpensesData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                            <YAxis tick={{ fontSize: 10 }} />
+                            <Tooltip
+                              formatter={(v: any, name: any) => [
+                                currency(v),
+                                name === "income" ? "Income" : "General Expenses",
+                              ]}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="income"
+                              name="Income"
+                              stroke="#10B981"
+                              strokeWidth={3}
+                              dot={{ fill: "#10B981", strokeWidth: 2, r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="generalExpenses"
+                              name="General Expenses"
+                              stroke="#3B82F6"
+                              strokeWidth={3}
+                              dot={{ fill: "#3B82F6", strokeWidth: 2, r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </ModernCardContent>
+                </ModernCard>
+              </div>
+
+              {/* Existing individual trend charts */}
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Income Trend */}
               <ModernCard className="xl:col-span-1">
                 <ModernCardHeader className="flex flex-row items-center justify-between pb-2">
@@ -412,6 +630,7 @@ export default function ModernDashboardPage() {
                   )}
                 </ModernCardContent>
               </ModernCard>
+              </div>
             </div>
           </section>
         </div>
