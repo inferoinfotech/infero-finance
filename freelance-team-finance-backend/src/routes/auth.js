@@ -14,7 +14,7 @@ router.post('/login', authController.login);
 router.post('/users',    auth, allow('admin'), adminCreateUser);
 router.patch('/users/:id', auth, allow('admin'), adminUpdateUser);
 router.delete('/users/:id', auth, allow('admin'), adminDeleteUser);
-router.get('/users',        auth, allow('admin'), adminListUsers);   // list with optional ?search=&page=&limit=
+router.get('/users',        auth, allow('admin', 'owner'), adminListUsers);   // list with optional ?search=&page=&limit=
 router.get('/users/:id',    auth, allow('admin'), adminGetUser); 
 
 module.exports = router;

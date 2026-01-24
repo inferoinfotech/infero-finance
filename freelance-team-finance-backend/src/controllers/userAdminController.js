@@ -154,6 +154,10 @@ exports.adminListUsers = async (req, res, next) => {
         ] }
       : {};
 
+    if (req.user?.role === ROLES.OWNER) {
+      q.role = ROLES.OWNER;
+    }
+
     const skip = (Math.max(Number(page), 1) - 1) * Math.max(Number(limit), 1);
     const [items, total] = await Promise.all([
       User.find(q, { password: 0 }).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
