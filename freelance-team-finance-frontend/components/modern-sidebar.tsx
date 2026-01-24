@@ -40,7 +40,7 @@ const navigation = [
 function itemsForRole(role?: Role) {
   if (!role) return []
   if (role === "sales") return navigation.filter((n) => ["Leads", "Work Board"].includes(n.name))
-  if (role === "developer") return navigation.filter((n) => ["Reports", "Work Board"].includes(n.name))
+  if (role === "developer") return navigation.filter((n) => n.name === "Work Board")
   // admin & owner get everything
   if (role === "admin" || role === "owner") return navigation
   return []
