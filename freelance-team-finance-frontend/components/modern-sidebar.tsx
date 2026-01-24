@@ -10,6 +10,7 @@ import {
   Wallet, 
   Settings, 
   History, 
+  ClipboardList,
   Bell, 
   FileText, 
   LogOut,
@@ -27,6 +28,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, color: "text-blue-600" },
   { name: "Leads", href: "/leads", icon: FileText, color: "text-green-600" },
   { name: "Projects", href: "/projects", icon: FolderOpen, color: "text-purple-600" },
+  { name: "Work Board", href: "/work-board", icon: ClipboardList, color: "text-cyan-600" },
   { name: "Expenses", href: "/expenses", icon: Receipt, color: "text-orange-600" },
   { name: "Accounts", href: "/accounts", icon: Wallet, color: "text-teal-600" },
   { name: "Platforms", href: "/platforms", icon: Settings, color: "text-indigo-600" },
@@ -37,8 +39,8 @@ const navigation = [
 
 function itemsForRole(role?: Role) {
   if (!role) return []
-  if (role === "sales") return navigation.filter((n) => n.name === "Leads")
-  if (role === "developer") return navigation.filter((n) => n.name === "Reports")
+  if (role === "sales") return navigation.filter((n) => ["Leads", "Work Board"].includes(n.name))
+  if (role === "developer") return navigation.filter((n) => ["Reports", "Work Board"].includes(n.name))
   // admin & owner get everything
   if (role === "admin" || role === "owner") return navigation
   return []

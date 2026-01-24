@@ -179,6 +179,10 @@ class ApiClient {
     })
   }
 
+  async getProjectTitles() {
+    return this.request("/api/projects/titles")
+  }
+
   // History endpoint
   async getHistory() {
     const data = await this.request("/api/history")
@@ -304,6 +308,68 @@ async getGeneralExpensesReport(groupBy: "month" | "day" = "month") {
 
   async deleteUser(id: string) {
     return this.request(`/api/auth/users/${id}`, { method: 'DELETE' })
+  }
+
+  // ------- Tasks -------
+  async getTasks(params?: {
+    status?: string
+    priority?: string
+    assignedTo?: string
+    assignedRole?: string
+    search?: string
+    dueFrom?: string
+    dueTo?: string
+  }) {
+    const qs = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && `${v}`.length) qs.append(k, `${v}`)
+      })
+    }
+    return this.request(`/api/tasks${qs.toString() ? `?${qs}` : ""}`)
+  }
+
+  async getTask(id: string) {
+    return this.request(`/api/tasks/${id}`)
+  }
+
+  async createTask(payload: any) {
+    return this.request("/api/tasks", { method: "POST", body: JSON.stringify(payload) })
+  }
+
+  async updateTask(id: string, payload: any) {
+    return this.request(`/api/tasks/${id}`, { method: "PUT", body: JSON.stringify(payload) })
+  }
+
+  async deleteTask(id: string) {
+    return this.request(`/api/tasks/${id}`, { method: "DELETE" })
+  }
+
+  async getArchivedTasks() {
+    return this.request("/api/tasks/archived")
+  }
+
+  async getArchivedTask(id: string) {
+    return this.request(`/api/tasks/archived/${id}`)
+  }
+
+  async archiveTask(id: string) {
+    return this.request(`/api/tasks/${id}/archive`, { method: "POST" })
+  }
+
+  async getTaskComments(taskId: string) {
+    return this.request(`/api/tasks/${taskId}/comments`)
+  }
+
+  async addTaskComment(taskId: string, text: string) {
+    return this.request(`/api/tasks/${taskId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    })
+  }
+
+  async getTaskActivity(taskId: string) {
+    return this.request(`/api/tasks/${taskId}/activity`)
   }
 }
 

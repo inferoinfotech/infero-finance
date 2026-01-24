@@ -7,6 +7,7 @@ const { allow } = require('../middleware/roles');
 // All protected
 router.post('/', auth, allow('admin', 'owner'), projectController.createProject);
 router.get('/', auth, allow('admin', 'owner'), projectController.getProjects);
+router.get('/titles', auth, allow('admin', 'owner', 'sales', 'developer'), projectController.getProjectTitles);
 router.get('/:projectId', auth, allow('admin', 'owner'), projectController.getProjectById);
 router.put('/:projectId', auth, allow('admin', 'owner'), projectController.updateProject);
 router.delete('/:projectId', auth, allow('admin', 'owner'), projectController.deleteProject);

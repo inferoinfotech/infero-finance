@@ -1,0 +1,36 @@
+const mongoose = require('mongoose');
+const { ROLES } = require('./User');
+
+const taskSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    description: { type: String, default: '' },
+    status: {
+      type: String,
+      enum: ['todo', 'in_progress', 'blocked', 'on_hold', 'in_review', 'done'],
+      default: 'todo',
+    },
+    priority: {
+      type: String,
+      enum: ['low', 'medium', 'high', 'urgent'],
+      default: 'medium',
+    },
+    dueDate: { type: Date },
+    project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    assignedRole: { type: String, enum: Object.values(ROLES) },
+    collaborators: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    collaboratorRoles: [{ type: String, enum: Object.values(ROLES) }],
+    isGlobal: { type: Boolean, default: false },
+    subtasks: [
+      {
+        title: { type: String, required: true, trim: true },
+        done: { type: Boolean, default: false },
+      },
+    ],
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model('Task', taskSchema);

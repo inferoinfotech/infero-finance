@@ -60,6 +60,19 @@ exports.getProjects = async (req, res, next) => {
   }
 };
 
+// Get project titles (minimal data)
+exports.getProjectTitles = async (req, res, next) => {
+  try {
+    const query = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? {}
+      : { createdBy: req.user.userId };
+    const projects = await Project.find(query, { name: 1 }).sort({ createdAt: -1 });
+    res.json({ projects });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Get project by ID (details)
 exports.getProjectById = async (req, res, next) => {
   try {
