@@ -139,20 +139,22 @@
   }
   .thin-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgb(209 213 219) transparent;
+    scrollbar-color: rgb(156 163 175) rgb(243 244 246);
   }
   .thin-scrollbar::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 6px;
+    height: 6px;
   }
   .thin-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgb(243 244 246);
+    border-radius: 10px;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgb(209 213 219);
-    border-radius: 9999px;
+    background-color: rgb(156 163 175);
+    border-radius: 10px;
+    border: 1px solid rgb(243 244 246);
   }
   .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(156 163 175);
+    background-color: rgb(107 114 128);
   }
 }

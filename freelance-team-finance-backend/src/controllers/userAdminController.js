@@ -154,9 +154,8 @@ exports.adminListUsers = async (req, res, next) => {
         ] }
       : {};
 
-    if (req.user?.role === ROLES.OWNER) {
-      q.role = ROLES.OWNER;
-    }
+    // Remove role filtering - show all users (except admin will be filtered on frontend)
+    // This allows all roles to see all users for task assignment
 
     const skip = (Math.max(Number(page), 1) - 1) * Math.max(Number(limit), 1);
     const [items, total] = await Promise.all([

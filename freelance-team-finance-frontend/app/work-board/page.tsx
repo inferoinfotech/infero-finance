@@ -750,7 +750,8 @@ export default function WorkBoardPage() {
                   </div>
                 </ModernCardHeader>
                 <ModernCardContent
-                  className="space-y-4 flex-1 overflow-y-auto px-2 thin-scrollbar"
+                  className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden px-2 thin-scrollbar min-h-0"
+                  style={{ maxHeight: '100%' }}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault()
@@ -1006,7 +1007,7 @@ export default function WorkBoardPage() {
                   <div className="text-sm text-gray-400">No subtasks yet</div>
                 )}
                 {formData.subtasks.map((subtask, index) => (
-                  <div key={`${subtask.title}-${index}`} className="flex items-center gap-2">
+                  <div key={`${subtask.title}-${index}`} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
                     <input
                       type="checkbox"
                       checked={subtask.done}
@@ -1015,27 +1016,29 @@ export default function WorkBoardPage() {
                         next[index] = { ...next[index], done: e.target.checked }
                         setFormData({ ...formData, subtasks: next })
                       }}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
                     />
-                    <span className={cn("text-sm flex-1", subtask.done ? "line-through text-gray-400" : "text-gray-700")}>
+                    <span className={cn("text-sm flex-1 min-w-0", subtask.done ? "line-through text-gray-400" : "text-gray-700")}>
                       {subtask.title}
                     </span>
-                    <select
-                      value={subtask.assignedTo || ""}
-                      onChange={(e) => {
-                        const next = [...formData.subtasks]
-                        next[index] = { ...next[index], assignedTo: e.target.value || undefined }
-                        setFormData({ ...formData, subtasks: next })
-                      }}
-                      className="text-xs px-2 py-1 rounded border border-gray-300"
-                    >
-                      <option value="">Unassigned</option>
-                      {filteredUsers.map((u) => (
-                        <option key={u._id} value={u._id}>
-                          {u.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex-shrink-0 w-40">
+                      <select
+                        value={subtask.assignedTo || ""}
+                        onChange={(e) => {
+                          const next = [...formData.subtasks]
+                          next[index] = { ...next[index], assignedTo: e.target.value || undefined }
+                          setFormData({ ...formData, subtasks: next })
+                        }}
+                        className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      >
+                        <option value="">Unassigned</option>
+                        {filteredUsers.map((u) => (
+                          <option key={u._id} value={u._id}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <ModernButton
                       type="button"
                       variant="outline"
@@ -1044,6 +1047,7 @@ export default function WorkBoardPage() {
                         const next = formData.subtasks.filter((_, i) => i !== index)
                         setFormData({ ...formData, subtasks: next })
                       }}
+                      className="flex-shrink-0 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
                     >
                       Remove
                     </ModernButton>
