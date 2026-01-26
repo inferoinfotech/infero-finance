@@ -420,13 +420,30 @@ export default function WorkBoardPage() {
     setMovingTaskId(draggingTaskId)
     try {
       const currentTask = tasks.find((t) => t._id === draggingTaskId)
+      if (!currentTask) return
+
       const payload: any = { status }
-      if (targetIndex !== undefined && currentTask?.status === status) {
-        payload.order = targetIndex
-      } else if (currentTask?.status !== status) {
-        payload.order = 0
+      
+      if (targetIndex !== undefined && currentTask.status === status) {
+        const sameStatusTasks = [...(tasksByStatus[status] || [])]
+        const currentIndex = sameStatusTasks.findIndex((t) => t._id === draggingTaskId)
+        
+        if (currentIndex !== -1 && currentIndex !== targetIndex) {
+          const [movedTask] = sameStatusTasks.splice(currentIndex, 1)
+          sameStatusTasks.splice(targetIndex, 0, movedTask)
+          
+          const updatePromises = sameStatusTasks.map((task, idx) => {
+            return apiClient.updateTask(task._id, { order: idx, status })
+          })
+          await Promise.all(updatePromises)
+        }
+      } else {
+        if (currentTask.status !== status) {
+          payload.order = 0
+        }
+        await apiClient.updateTask(draggingTaskId, payload)
       }
-      await apiClient.updateTask(draggingTaskId, payload)
+      
       await fetchTasks()
     } catch (error) {
       console.error("Failed to update status:", error)
@@ -733,12 +750,28 @@ export default function WorkBoardPage() {
                   </div>
                 </ModernCardHeader>
                 <ModernCardContent
-                  className="space-y-4 flex-1 overflow-y-auto px-2 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+                  className="space-y-4 flex-1 overflow-y-auto px-2 thin-scrollbar"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault()
                     if (draggingTaskId) {
-                      handleDropStatus(status.value as TaskItem["status"])
+                      const tasks = tasksByStatus[status.value] || []
+                      const containerRect = e.currentTarget.getBoundingClientRect()
+                      const mouseY = e.clientY - containerRect.top
+                      let targetIndex = tasks.length
+                      
+                      for (let i = 0; i < tasks.length; i++) {
+                        const taskEl = document.querySelector(`[data-task-id="${tasks[i]._id}"]`)
+                        if (taskEl) {
+                          const taskRect = taskEl.getBoundingClientRect()
+                          const relativeTop = taskRect.top - containerRect.top
+                          if (mouseY < relativeTop + taskRect.height / 2) {
+                            targetIndex = i
+                            break
+                          }
+                        }
+                      }
+                      handleDropStatus(status.value as TaskItem["status"], targetIndex)
                     }
                   }}
                 >
@@ -756,13 +789,19 @@ export default function WorkBoardPage() {
                         if (!movingTaskId) setDraggingTaskId(task._id)
                       }}
                       onDragOver={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
                         if (task.status === status.value && draggingTaskId && draggingTaskId !== task._id) {
                           handleDragOver(e, index)
                         }
                       }}
-                      onDragLeave={handleDragLeave}
+                      onDragLeave={(e) => {
+                        e.currentTarget.style.borderTop = "none"
+                        e.currentTarget.style.borderBottom = "none"
+                      }}
                       onDrop={(e) => {
                         e.preventDefault()
+                        e.stopPropagation()
                         e.currentTarget.style.borderTop = "none"
                         e.currentTarget.style.borderBottom = "none"
                         if (draggingTaskId && draggingTaskId !== task._id && task.status === status.value) {
@@ -852,7 +891,7 @@ export default function WorkBoardPage() {
           resetForm()
         }
       }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto thin-scrollbar">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               {editingTask ? "Edit Task" : "Add New Task"}
