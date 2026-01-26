@@ -742,17 +742,16 @@ export default function WorkBoardPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-6 h-[calc(100vh-280px)]">
             {statusOptions.map((status) => (
-              <ModernCard key={status.value} className="h-full flex flex-col">
+              <ModernCard key={status.value} className="h-full flex flex-col overflow-visible">
                 <ModernCardHeader className="flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <ModernCardTitle className="text-lg">{status.label}</ModernCardTitle>
                     <ModernBadge variant="secondary">{tasksByStatus[status.value]?.length || 0}</ModernBadge>
                   </div>
                 </ModernCardHeader>
-                <ModernCardContent
-                  className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden px-2 thin-scrollbar min-h-0"
-                  style={{ maxHeight: '100%' }}
-                  onDragOver={(e) => e.preventDefault()}
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden thin-scrollbar space-y-4 px-2 pb-6"
+                    style={{ maxHeight: 'calc(100vh - 360px)' }}
+                    onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault()
                     if (draggingTaskId) {
@@ -878,7 +877,7 @@ export default function WorkBoardPage() {
                   {(tasksByStatus[status.value] || []).length === 0 && (
                     <div className="text-sm text-gray-400 text-center py-6">No tasks</div>
                   )}
-                </ModernCardContent>
+                </div>
               </ModernCard>
             ))}
           </div>

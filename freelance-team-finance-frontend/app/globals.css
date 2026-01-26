@@ -139,22 +139,24 @@
   }
   .thin-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgb(156 163 175) rgb(243 244 246);
+    scrollbar-color: rgb(107 114 128) rgb(243 244 246);
   }
   .thin-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px !important;
+    height: 8px !important;
+    -webkit-appearance: none !important;
   }
   .thin-scrollbar::-webkit-scrollbar-track {
-    background: rgb(243 244 246);
-    border-radius: 10px;
+    background: rgb(243 244 246) !important;
+    border-radius: 4px !important;
+    margin: 4px 0 !important;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgb(156 163 175);
-    border-radius: 10px;
-    border: 1px solid rgb(243 244 246);
+    background-color: rgb(156 163 175) !important;
+    border-radius: 4px !important;
+    min-height: 30px !important;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(107 114 128);
+    background-color: rgb(107 114 128) !important;
   }
 }
