@@ -38,6 +38,7 @@ interface UserItem {
 interface ProjectItem {
   _id: string
   name: string
+  status?: string
 }
 
 interface TaskItem {
@@ -53,9 +54,10 @@ interface TaskItem {
   collaborators?: (UserItem | string)[]
   collaboratorRoles?: string[]
   isGlobal?: boolean
-  subtasks?: { title: string; done: boolean }[]
+  subtasks?: { title: string; done: boolean; assignedTo?: UserItem | string }[]
   createdBy?: UserItem | string
   createdAt: string
+  order?: number
 }
 
 const statusOptions = [
@@ -94,6 +96,8 @@ export default function WorkBoardPage() {
   const [activeScope, setActiveScope] = useState<"active" | "archived">("active")
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
+  const [movingTaskId, setMovingTaskId] = useState<string | null>(null)
+  const [projectStatusFilter, setProjectStatusFilter] = useState("")
 
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
@@ -116,7 +120,7 @@ export default function WorkBoardPage() {
     collaborators: [] as string[],
     collaboratorRoles: [] as string[],
     isGlobal: false,
-    subtasks: [] as { title: string; done: boolean }[],
+    subtasks: [] as { title: string; done: boolean; assignedTo?: string }[],
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -145,12 +149,21 @@ export default function WorkBoardPage() {
 
   const fetchProjects = async () => {
     try {
-      const data = await apiClient.getProjectTitles()
+      const data = await apiClient.getProjects()
       setProjects(Array.isArray(data.projects) ? data.projects : [])
     } catch (error) {
       console.error("Failed to fetch projects:", error)
     }
   }
+
+  const filteredProjects = useMemo(() => {
+    if (!projectStatusFilter) return projects
+    return projects.filter((p) => p.status === projectStatusFilter)
+  }, [projects, projectStatusFilter])
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => u.role !== "admin")
+  }, [users])
 
   const fetchTasks = async () => {
     try {
@@ -219,6 +232,7 @@ export default function WorkBoardPage() {
     })
     setErrors({})
     setNewSubtaskTitle("")
+    setProjectStatusFilter("")
   }
 
   const handleEdit = (task: TaskItem) => {
@@ -238,7 +252,11 @@ export default function WorkBoardPage() {
         .filter((id): id is string => Boolean(id)),
       collaboratorRoles: task.collaboratorRoles || [],
       isGlobal: !!task.isGlobal,
-      subtasks: task.subtasks || [],
+      subtasks: (task.subtasks || []).map((s) => ({
+        title: s.title,
+        done: s.done || false,
+        assignedTo: typeof s.assignedTo === "object" ? s.assignedTo?._id : (s.assignedTo || undefined),
+      })),
     })
     setShowForm(true)
   }
@@ -334,7 +352,8 @@ export default function WorkBoardPage() {
 
   const tasksByStatus = useMemo(() => {
     return statusOptions.reduce<Record<string, TaskItem[]>>((acc, s) => {
-      acc[s.value] = filteredTasks.filter((t) => t.status === s.value)
+      const tasks = filteredTasks.filter((t) => t.status === s.value)
+      acc[s.value] = tasks.sort((a, b) => (a.order || 0) - (b.order || 0))
       return acc
     }, {})
   }, [filteredTasks])
@@ -396,16 +415,47 @@ export default function WorkBoardPage() {
     return { total, done, percent }
   }
 
-  const handleDropStatus = async (status: TaskItem["status"]) => {
+  const handleDropStatus = async (status: TaskItem["status"], targetIndex?: number) => {
     if (!draggingTaskId) return
+    setMovingTaskId(draggingTaskId)
     try {
-      await apiClient.updateTask(draggingTaskId, { status })
+      const currentTask = tasks.find((t) => t._id === draggingTaskId)
+      const payload: any = { status }
+      if (targetIndex !== undefined && currentTask?.status === status) {
+        payload.order = targetIndex
+      } else if (currentTask?.status !== status) {
+        payload.order = 0
+      }
+      await apiClient.updateTask(draggingTaskId, payload)
       await fetchTasks()
     } catch (error) {
       console.error("Failed to update status:", error)
     } finally {
-      setDraggingTaskId(null)
+      setTimeout(() => {
+        setDraggingTaskId(null)
+        setMovingTaskId(null)
+      }, 300)
     }
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (!draggingTaskId) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const midpoint = rect.top + rect.height / 2
+    const mouseY = e.clientY
+    if (mouseY < midpoint) {
+      e.currentTarget.style.borderTop = "2px solid #3b82f6"
+      e.currentTarget.style.borderBottom = "none"
+    } else {
+      e.currentTarget.style.borderTop = "none"
+      e.currentTarget.style.borderBottom = "2px solid #3b82f6"
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.currentTarget.style.borderTop = "none"
+    e.currentTarget.style.borderBottom = "none"
   }
 
   if (loading) {
@@ -482,7 +532,7 @@ export default function WorkBoardPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               icon={<Search className="h-4 w-4" />}
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 gap-4">
               <ModernSelect
                 label="Status"
                 value={statusFilter}
@@ -501,7 +551,7 @@ export default function WorkBoardPage() {
                 onChange={(e) => setAssignedToFilter(e.target.value)}
                 options={[
                   { value: "", label: "All Users" },
-                  ...users.map((u) => ({ value: u._id, label: u.name })),
+                  ...filteredUsers.map((u) => ({ value: u._id, label: u.name })),
                 ]}
               />
               <ModernSelect
@@ -511,12 +561,28 @@ export default function WorkBoardPage() {
                 options={[{ value: "", label: "All Roles" }, ...roleOptions]}
               />
               <ModernSelect
+                label="Project Status"
+                value={projectStatusFilter}
+                onChange={(e) => {
+                  setProjectStatusFilter(e.target.value)
+                  setProjectFilter("")
+                }}
+                options={[
+                  { value: "", label: "All Status" },
+                  { value: "pending", label: "Pending" },
+                  { value: "working", label: "Working" },
+                  { value: "completed", label: "Completed" },
+                  { value: "extended", label: "Extended" },
+                  { value: "paused", label: "Paused" },
+                ]}
+              />
+              <ModernSelect
                 label="Project"
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
                 options={[
                   { value: "", label: "All Projects" },
-                  ...projects.map((p) => ({ value: p._id, label: p.name })),
+                  ...filteredProjects.map((p) => ({ value: p._id, label: p.name })),
                 ]}
               />
               <ModernInput
@@ -657,30 +723,62 @@ export default function WorkBoardPage() {
             </ModernCardContent>
           </ModernCard>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-6 h-[calc(100vh-280px)]">
             {statusOptions.map((status) => (
-              <ModernCard key={status.value} className="h-full">
-                <ModernCardHeader>
+              <ModernCard key={status.value} className="h-full flex flex-col">
+                <ModernCardHeader className="flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <ModernCardTitle className="text-lg">{status.label}</ModernCardTitle>
                     <ModernBadge variant="secondary">{tasksByStatus[status.value]?.length || 0}</ModernBadge>
                   </div>
                 </ModernCardHeader>
                 <ModernCardContent
-                  className="space-y-4 max-h-[70vh] overflow-y-auto px-2"
+                  className="space-y-4 flex-1 overflow-y-auto px-2 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => handleDropStatus(status.value as TaskItem["status"])}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    if (draggingTaskId) {
+                      handleDropStatus(status.value as TaskItem["status"])
+                    }
+                  }}
                 >
-                  {(tasksByStatus[status.value] || []).map((task) => (
+                  {(tasksByStatus[status.value] || []).map((task, index) => (
                     <div
                       key={task._id}
+                      data-task-id={task._id}
                       className={cn(
-                        "p-4 rounded-xl border shadow-sm cursor-grab active:cursor-grabbing",
-                        getPriorityCardClass(task.priority)
+                        "relative p-4 rounded-xl border shadow-sm cursor-grab active:cursor-grabbing transition-opacity",
+                        getPriorityCardClass(task.priority),
+                        movingTaskId === task._id && "opacity-50"
                       )}
-                      draggable
-                      onDragStart={() => setDraggingTaskId(task._id)}
+                      draggable={!movingTaskId}
+                      onDragStart={() => {
+                        if (!movingTaskId) setDraggingTaskId(task._id)
+                      }}
+                      onDragOver={(e) => {
+                        if (task.status === status.value && draggingTaskId && draggingTaskId !== task._id) {
+                          handleDragOver(e, index)
+                        }
+                      }}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        e.currentTarget.style.borderTop = "none"
+                        e.currentTarget.style.borderBottom = "none"
+                        if (draggingTaskId && draggingTaskId !== task._id && task.status === status.value) {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          const mouseY = e.clientY
+                          const midpoint = rect.top + rect.height / 2
+                          const targetIndex = mouseY < midpoint ? index : index + 1
+                          handleDropStatus(status.value as TaskItem["status"], targetIndex)
+                        }
+                      }}
                     >
+                      {movingTaskId === task._id && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/90 rounded-xl z-10">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-gray-900">{task.title}</h3>
                         {task.priority === "urgent" ? (
@@ -710,12 +808,8 @@ export default function WorkBoardPage() {
                           </div>
                         </div>
                       )}
-                      <div className="text-sm text-gray-600 flex items-center gap-2 mb-2">
-                        <User className="h-4 w-4" />
-                        {getAssigneeLabel(task)}
-                      </div>
                       <div className="text-sm text-gray-600 flex items-center gap-2 mb-3">
-                        <Users className="h-4 w-4" />
+                        <User className="h-4 w-4" />
                         {getAssigneeLabel(task)}
                       </div>
                       {task.dueDate && (
@@ -758,7 +852,7 @@ export default function WorkBoardPage() {
           resetForm()
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               {editingTask ? "Edit Task" : "Add New Task"}
@@ -798,12 +892,28 @@ export default function WorkBoardPage() {
                 icon={<Calendar className="h-4 w-4" />}
               />
               <ModernSelect
+                label="Project Status"
+                value={projectStatusFilter}
+                onChange={(e) => {
+                  setProjectStatusFilter(e.target.value)
+                  setFormData({ ...formData, project: "" })
+                }}
+                options={[
+                  { value: "", label: "All Status" },
+                  { value: "pending", label: "Pending" },
+                  { value: "working", label: "Working" },
+                  { value: "completed", label: "Completed" },
+                  { value: "extended", label: "Extended" },
+                  { value: "paused", label: "Paused" },
+                ]}
+              />
+              <ModernSelect
                 label="Project"
                 value={formData.project}
                 onChange={(e) => setFormData({ ...formData, project: e.target.value })}
                 options={[
                   { value: "", label: "No project" },
-                  ...projects.map((p) => ({ value: p._id, label: p.name })),
+                  ...filteredProjects.map((p) => ({ value: p._id, label: p.name })),
                 ]}
               />
               <ModernSelect
@@ -814,7 +924,7 @@ export default function WorkBoardPage() {
                 }}
                 options={[
                   { value: "", label: "Unassigned" },
-                  ...users.map((u) => ({ value: u._id, label: u.name })),
+                  ...filteredUsers.map((u) => ({ value: u._id, label: u.name })),
                 ]}
               />
               <ModernSelect
@@ -871,6 +981,22 @@ export default function WorkBoardPage() {
                     <span className={cn("text-sm flex-1", subtask.done ? "line-through text-gray-400" : "text-gray-700")}>
                       {subtask.title}
                     </span>
+                    <select
+                      value={subtask.assignedTo || ""}
+                      onChange={(e) => {
+                        const next = [...formData.subtasks]
+                        next[index] = { ...next[index], assignedTo: e.target.value || undefined }
+                        setFormData({ ...formData, subtasks: next })
+                      }}
+                      className="text-xs px-2 py-1 rounded border border-gray-300"
+                    >
+                      <option value="">Unassigned</option>
+                      {filteredUsers.map((u) => (
+                        <option key={u._id} value={u._id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
                     <ModernButton
                       type="button"
                       variant="outline"
@@ -898,7 +1024,7 @@ export default function WorkBoardPage() {
                     if (!newSubtaskTitle.trim()) return
                     setFormData({
                       ...formData,
-                      subtasks: [...formData.subtasks, { title: newSubtaskTitle.trim(), done: false }],
+                      subtasks: [...formData.subtasks, { title: newSubtaskTitle.trim(), done: false, assignedTo: undefined }],
                     })
                     setNewSubtaskTitle("")
                   }}
@@ -912,8 +1038,8 @@ export default function WorkBoardPage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Collaborate Users</label>
                 <div className="max-h-40 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-2">
-                  {users.length === 0 && <div className="text-sm text-gray-400">No users</div>}
-                  {users.map((u) => (
+                  {filteredUsers.length === 0 && <div className="text-sm text-gray-400">No users</div>}
+                  {filteredUsers.map((u) => (
                     <label key={u._id} className="flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"

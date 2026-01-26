@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { ModernMainLayout } from "@/components/modern-main-layout"
 import { ModernCard, ModernCardContent, ModernCardHeader, ModernCardTitle } from "@/components/ui/modern-card"
 import { ModernBadge } from "@/components/ui/modern-badge"
@@ -9,8 +10,8 @@ import { ModernButton } from "@/components/ui/modern-button"
 import { ModernInput } from "@/components/ui/modern-input"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { apiClient } from "@/lib/api"
-import { formatDateDDMMYYYY } from "@/lib/utils"
-import { Calendar, User, MessageSquare } from "lucide-react"
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from "@/lib/utils"
+import { Calendar, User, MessageSquare, ArrowLeft, Users, FileText, Clock, CheckCircle2, XCircle } from "lucide-react"
 
 interface UserItem {
   _id: string
@@ -33,9 +34,10 @@ interface TaskItem {
   collaborators?: (UserItem | string)[]
   collaboratorRoles?: string[]
   isGlobal?: boolean
-  subtasks?: { title: string; done: boolean }[]
+  subtasks?: { title: string; done: boolean; assignedTo?: UserItem | string }[]
   createdBy?: UserItem | string
   createdAt: string
+  updatedAt?: string
 }
 
 interface CommentItem {
@@ -55,6 +57,7 @@ interface ActivityItem {
 
 export default function WorkBoardTaskDetailPage() {
   const params = useParams<{ taskId: string }>()
+  const router = useRouter()
   const taskId = params?.taskId as string
   const [loading, setLoading] = useState(true)
   const [task, setTask] = useState<TaskItem | null>(null)
@@ -62,11 +65,22 @@ export default function WorkBoardTaskDetailPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [commentText, setCommentText] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [users, setUsers] = useState<UserItem[]>([])
 
   useEffect(() => {
     if (!taskId) return
     fetchAll()
+    fetchUsers()
   }, [taskId])
+
+  const fetchUsers = async () => {
+    try {
+      const data = await apiClient.getUsers({ limit: 200 })
+      setUsers(Array.isArray(data.users) ? data.users : [])
+    } catch (error) {
+      console.error("Failed to fetch users:", error)
+    }
+  }
 
   const fetchAll = async () => {
     try {
@@ -115,6 +129,35 @@ export default function WorkBoardTaskDetailPage() {
     return { total, done, percent }
   }
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "todo": return "secondary"
+      case "in_progress": return "info"
+      case "blocked": return "danger"
+      case "on_hold": return "warning"
+      case "in_review": return "purple"
+      case "done": return "success"
+      default: return "secondary"
+    }
+  }
+
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case "low": return "secondary"
+      case "medium": return "info"
+      case "high": return "warning"
+      case "urgent": return "danger"
+      default: return "secondary"
+    }
+  }
+
+  const getUserName = (user: UserItem | string | undefined) => {
+    if (!user) return "Unassigned"
+    if (typeof user === "object") return user.name
+    const found = users.find((u) => u._id === user)
+    return found?.name || "Unknown"
+  }
+
   if (loading) {
     return (
       <ModernMainLayout>
@@ -137,110 +180,243 @@ export default function WorkBoardTaskDetailPage() {
   return (
     <ModernMainLayout>
       <div className="space-y-6">
-        <ModernCard>
-          <ModernCardHeader>
-            <ModernCardTitle className="text-2xl">{task.title}</ModernCardTitle>
-          </ModernCardHeader>
-          <ModernCardContent className="space-y-4">
-            {task.description && <p className="text-gray-700">{task.description}</p>}
-            <div className="flex flex-wrap gap-2">
-              <ModernBadge variant="info">{task.status.replace("_", " ")}</ModernBadge>
-              <ModernBadge variant="warning">{task.priority}</ModernBadge>
-              {task.project && (
-                <ModernBadge variant="secondary">
-                  Project: {typeof task.project === "object" ? task.project?.name || "Project" : "Project"}
-                </ModernBadge>
-              )}
-              {task.isGlobal && <ModernBadge variant="purple">Visible to everyone</ModernBadge>}
-            </div>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <User className="h-4 w-4" />
-                {typeof task.assignedTo === "object"
-                  ? task.assignedTo?.name || "Unassigned"
-                  : task.assignedRole || "Unassigned"}
-              </div>
-              {task.dueDate && (
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  {formatDateDDMMYYYY(task.dueDate)}
-                </div>
-              )}
-            </div>
-            {getProgress().total > 0 && (
-              <div>
-                <div className="text-xs text-gray-500 mb-1">
-                  {getProgress().done}/{getProgress().total} subtasks completed
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500" style={{ width: `${getProgress().percent}%` }} />
-                </div>
-              </div>
-            )}
-            {task.subtasks && task.subtasks.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-700">Subtasks</div>
-                {task.subtasks.map((s, idx) => (
-                  <div key={`${s.title}-${idx}`} className="text-sm text-gray-600">
-                    {s.done ? "✅" : "⬜"} {s.title}
-                  </div>
-                ))}
-              </div>
-            )}
-          </ModernCardContent>
-        </ModernCard>
+        <div className="flex items-center gap-4">
+          <ModernButton variant="outline" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </ModernButton>
+          <h1 className="text-3xl font-bold text-gray-900">Task Details</h1>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ModernCard>
-            <ModernCardHeader>
-              <ModernCardTitle className="text-lg flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Comments
-              </ModernCardTitle>
-            </ModernCardHeader>
-            <ModernCardContent className="space-y-4">
-              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
-                {comments.length === 0 && <div className="text-sm text-gray-400">No comments yet</div>}
-                {comments.map((c) => (
-                  <div key={c._id} className="p-3 rounded-xl border border-gray-200 bg-white">
-                    <div className="text-sm text-gray-700">{c.text}</div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      {c.user?.name || "Unknown"} • {formatDateDDMMYYYY(c.createdAt)}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <ModernCard>
+              <ModernCardHeader>
+                <ModernCardTitle className="text-2xl">{task.title}</ModernCardTitle>
+              </ModernCardHeader>
+              <ModernCardContent className="space-y-6">
+                {task.description && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Description</h3>
+                    <p className="text-gray-700 whitespace-pre-wrap">{task.description}</p>
+                  </div>
+                )}
+
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Status & Priority</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <ModernBadge variant={getStatusBadge(task.status)}>
+                      {task.status.replace("_", " ")}
+                    </ModernBadge>
+                    <ModernBadge variant={getPriorityBadge(task.priority)}>
+                      {task.priority}
+                    </ModernBadge>
+                    {task.isGlobal && <ModernBadge variant="purple">Visible to everyone</ModernBadge>}
+                  </div>
+                </div>
+
+                {task.subtasks && task.subtasks.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Subtasks</h3>
+                    {getProgress().total > 0 && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                          <span>Progress</span>
+                          <span>{getProgress().done}/{getProgress().total} completed</span>
+                        </div>
+                        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 transition-all"
+                            style={{ width: `${getProgress().percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {task.subtasks.map((s, idx) => (
+                        <div
+                          key={`${s.title}-${idx}`}
+                          className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 bg-white"
+                        >
+                          {s.done ? (
+                            <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-gray-300 flex-shrink-0" />
+                          )}
+                          <div className="flex-1">
+                            <div className={s.done ? "line-through text-gray-400" : "text-gray-900 font-medium"}>
+                              {s.title}
+                            </div>
+                            {s.assignedTo && (
+                              <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {getUserName(s.assignedTo)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </ModernCardContent>
+            </ModernCard>
+
+            <ModernCard>
+              <ModernCardHeader>
+                <ModernCardTitle className="text-lg flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Comments
+                </ModernCardTitle>
+              </ModernCardHeader>
+              <ModernCardContent className="space-y-4">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {comments.length === 0 && (
+                    <div className="text-sm text-gray-400 text-center py-8">No comments yet</div>
+                  )}
+                  {comments.map((c) => (
+                    <div key={c._id} className="p-4 rounded-xl border border-gray-200 bg-white">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
+                          {c.user?.name?.charAt(0)?.toUpperCase() || "?"}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-gray-900">{c.user?.name || "Unknown"}</span>
+                            <span className="text-xs text-gray-400">
+                              {formatDateTimeDDMMYYYY(c.createdAt)}
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-700">{c.text}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-2 border-t border-gray-200">
+                  <ModernInput
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Write a comment..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        handleAddComment()
+                      }
+                    }}
+                  />
+                  <ModernButton onClick={handleAddComment} loading={submitting} disabled={submitting || !commentText.trim()}>
+                    Post
+                  </ModernButton>
+                </div>
+              </ModernCardContent>
+            </ModernCard>
+          </div>
+
+          <div className="space-y-6">
+            <ModernCard>
+              <ModernCardHeader>
+                <ModernCardTitle className="text-lg">Details</ModernCardTitle>
+              </ModernCardHeader>
+              <ModernCardContent className="space-y-4">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Project</div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {task.project ? (typeof task.project === "object" ? task.project?.name || "—" : "—") : "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Assigned To</div>
+                  <div className="flex items-center gap-2 text-sm text-gray-900">
+                    <User className="h-4 w-4" />
+                    {typeof task.assignedTo === "object"
+                      ? task.assignedTo?.name || "Unassigned"
+                      : task.assignedRole || "Unassigned"}
+                  </div>
+                </div>
+
+                {task.dueDate && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Due Date</div>
+                    <div className="flex items-center gap-2 text-sm text-gray-900">
+                      <Calendar className="h-4 w-4" />
+                      {formatDateDDMMYYYY(task.dueDate)}
+                    </div>
+                  </div>
+                )}
+
+                {(task.collaborators?.length || 0) + (task.collaboratorRoles?.length || 0) > 0 && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2">Collaborators</div>
+                    <div className="space-y-2">
+                      {task.collaborators?.map((c, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
+                          <Users className="h-4 w-4" />
+                          {getUserName(c)}
+                        </div>
+                      ))}
+                      {task.collaboratorRoles?.map((role, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
+                          <Users className="h-4 w-4" />
+                          {roleOptions.find((r) => r.value === role)?.label || role}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Created By</div>
+                  <div className="text-sm text-gray-900">
+                    {typeof task.createdBy === "object" ? task.createdBy?.name || "—" : "—"}
+                  </div>
+                </div>
+
+                {task.createdAt && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">Created At</div>
+                    <div className="flex items-center gap-2 text-sm text-gray-900">
+                      <Clock className="h-4 w-4" />
+                      {formatDateTimeDDMMYYYY(task.createdAt)}
+                    </div>
+                  </div>
+                )}
+              </ModernCardContent>
+            </ModernCard>
+
+            <ModernCard>
+              <ModernCardHeader>
+                <ModernCardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Activity Log
+                </ModernCardTitle>
+              </ModernCardHeader>
+              <ModernCardContent className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {activity.length === 0 && (
+                  <div className="text-sm text-gray-400 text-center py-8">No activity yet</div>
+                )}
+                {activity.map((a) => (
+                  <div key={a._id} className="p-3 rounded-lg border-l-4 border-blue-500 bg-blue-50">
+                    <div className="text-sm text-gray-700 mb-1">{a.message}</div>
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <User className="h-3 w-3" />
+                      {a.user?.name || "Unknown"} • {formatDateTimeDDMMYYYY(a.createdAt)}
                     </div>
                   </div>
                 ))}
-              </div>
-              <div className="flex gap-2">
-                <ModernInput
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Write a comment..."
-                />
-                <ModernButton onClick={handleAddComment} loading={submitting} disabled={submitting}>
-                  Post
-                </ModernButton>
-              </div>
-            </ModernCardContent>
-          </ModernCard>
-
-          <ModernCard>
-            <ModernCardHeader>
-              <ModernCardTitle className="text-lg">Activity</ModernCardTitle>
-            </ModernCardHeader>
-            <ModernCardContent className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
-              {activity.length === 0 && <div className="text-sm text-gray-400">No activity yet</div>}
-              {activity.map((a) => (
-                <div key={a._id} className="p-3 rounded-xl border border-gray-200 bg-white">
-                  <div className="text-sm text-gray-700">{a.message}</div>
-                  <div className="text-xs text-gray-500 mt-2">
-                    {a.user?.name || "Unknown"} • {formatDateDDMMYYYY(a.createdAt)}
-                  </div>
-                </div>
-              ))}
-            </ModernCardContent>
-          </ModernCard>
+              </ModernCardContent>
+            </ModernCard>
+          </div>
         </div>
       </div>
     </ModernMainLayout>
   )
 }
+
+const roleOptions = [
+  { value: "admin", label: "Admin" },
+  { value: "owner", label: "Owner" },
+  { value: "sales", label: "Sales" },
+  { value: "developer", label: "Developer" },
+]

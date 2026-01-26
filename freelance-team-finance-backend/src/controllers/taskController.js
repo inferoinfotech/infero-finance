@@ -86,7 +86,11 @@ exports.createTask = async (req, res, next) => {
     const cleanSubtasks = Array.isArray(subtasks)
       ? subtasks
           .filter((s) => s && typeof s.title === 'string' && s.title.trim())
-          .map((s) => ({ title: s.title.trim(), done: !!s.done }))
+          .map((s) => ({
+            title: s.title.trim(),
+            done: !!s.done,
+            assignedTo: s.assignedTo || undefined,
+          }))
       : [];
 
     const task = await Task.create({
@@ -170,11 +174,11 @@ exports.getTasks = async (req, res, next) => {
       : filters;
 
     const tasks = await Task.find(query)
-      .sort({ createdAt: -1 })
+      .sort({ order: 1, createdAt: -1 })
       .populate('assignedTo', 'name email role')
       .populate('collaborators', 'name email role')
       .populate('createdBy', 'name email role')
-      .populate('project', 'name');
+      .populate('project', 'name status');
 
     res.json({ tasks });
   } catch (err) {
@@ -225,6 +229,7 @@ exports.updateTask = async (req, res, next) => {
       'collaboratorRoles',
       'isGlobal',
       'subtasks',
+      'order',
     ];
     fields.forEach((field) => {
       if (field in req.body) {
@@ -233,7 +238,11 @@ exports.updateTask = async (req, res, next) => {
           const next = Array.isArray(req.body.subtasks)
             ? req.body.subtasks
                 .filter((s) => s && typeof s.title === 'string' && s.title.trim())
-                .map((s) => ({ title: s.title.trim(), done: !!s.done }))
+                .map((s) => ({
+                  title: s.title.trim(),
+                  done: !!s.done,
+                  assignedTo: s.assignedTo || undefined,
+                }))
             : [];
           task.subtasks = next;
           return;
