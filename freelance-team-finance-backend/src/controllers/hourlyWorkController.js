@@ -41,7 +41,7 @@ exports.getHourlyWorkForProject = async (req, res, next) => {
     const { projectId } = req.params;
     const logs = await HourlyWork.find({ project: projectId })
       .populate('user', 'name email')
-      .sort({ weekStart: 1 });
+      .sort({ weekStart: -1 });
     res.json({ logs });
   } catch (err) {
     next(err);

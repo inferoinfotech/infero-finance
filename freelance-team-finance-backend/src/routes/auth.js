@@ -10,6 +10,9 @@ router.post('/register', authController.register);
 // /api/auth/login
 router.post('/login', authController.login);
 
+router.get('/me', auth, authController.getMe);
+router.post('/pin', auth, authController.setPin);
+router.post('/verify-pin', auth, authController.verifyPin);
 
 router.post('/users',    auth, allow('admin'), adminCreateUser);
 router.patch('/users/:id', auth, allow('admin'), adminUpdateUser);

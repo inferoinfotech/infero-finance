@@ -49,6 +49,24 @@ class ApiClient {
     })
   }
 
+  async getMe() {
+    return this.request("/api/auth/me")
+  }
+
+  async setPin(pin: string) {
+    return this.request("/api/auth/pin", {
+      method: "POST",
+      body: JSON.stringify({ pin }),
+    })
+  }
+
+  async verifyPin(pin: string) {
+    return this.request("/api/auth/verify-pin", {
+      method: "POST",
+      body: JSON.stringify({ pin }),
+    })
+  }
+
   // Projects endpoints
   async getProjects() {
     return this.request("/api/projects")
@@ -355,6 +373,10 @@ async getGeneralExpensesReport(groupBy: "month" | "day" = "month") {
 
   async archiveTask(id: string) {
     return this.request(`/api/tasks/${id}/archive`, { method: "POST" })
+  }
+
+  async unarchiveTask(archivedTaskId: string) {
+    return this.request(`/api/tasks/archived/${archivedTaskId}/unarchive`, { method: "POST" })
   }
 
   async getTaskComments(taskId: string) {

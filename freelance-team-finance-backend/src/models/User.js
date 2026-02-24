@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     email:     { type: String, required: true, unique: true },
     password:  { type: String, required: true }, // hashed!
     role:      { type: String, enum: Object.values(ROLES), default: ROLES.SALES },
+    pinHash:   { type: String }, // bcrypt hash of 4-digit PIN for session lock
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

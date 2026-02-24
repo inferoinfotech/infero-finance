@@ -48,8 +48,10 @@ exports.createPayment = async (req, res, next) => {
       hoursBilled, hourlyWorkEntries
     } = req.body;
 
-    // 1) project check
-    const projQuery = Project.findOne({ _id: project, createdBy: req.user.userId });
+    // 1) project check — admin/owner can add payment to any project; others only their own
+    const projQuery = (req.user.role === 'admin' || req.user.role === 'owner')
+      ? Project.findOne({ _id: project })
+      : Project.findOne({ _id: project, createdBy: req.user.userId });
     const proj = session ? await projQuery.session(session) : await projQuery;
     if (!proj) return res.status(400).json({ error: 'Project not found or not yours' });
 
@@ -111,10 +113,6 @@ exports.createPayment = async (req, res, next) => {
           remark: `Payment received in bank (project ${proj._id})`
         }, session);
       }
-
-      // running total for project
-      proj.fixedPrice = (proj.fixedPrice || 0) + amt;
-      await proj.save(session ? { session } : {});
 
       // Log payment creation (after transaction commit)
       if (!session) {
@@ -196,9 +194,6 @@ exports.createPayment = async (req, res, next) => {
           remark: `Payment received in bank (project ${proj._id})`
         }, session);
       }
-
-      proj.budget = (proj.budget || 0) + calcAmount;
-      await proj.save(session ? { session } : {});
 
       // Log payment creation (after transaction commit)
       if (!session) {
@@ -460,13 +455,6 @@ exports.updatePayment = async (req, res, next) => {
     }
 
     const updated = await ProjectPayment.findByIdAndUpdate(paymentId, updates, { new: true, ...opts });
-
-    // recompute project totals
-    const all = await ProjectPayment.find({ project: project._id });
-    const totalReceived = all.reduce((acc, p) => acc + (p.amount || 0), 0);
-    if (project.priceType === 'fixed') project.fixedPrice = totalReceived;
-    else project.budget = totalReceived;
-    await project.save(opts);
 
     if (session) { await session.commitTransaction(); session.endSession(); }
 

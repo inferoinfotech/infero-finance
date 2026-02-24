@@ -479,3 +479,61 @@ exports.getArchivedTaskById = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.unarchiveTask = async (req, res, next) => {
+  try {
+    const archived = await TaskArchive.findById(req.params.id);
+    if (!archived) return res.status(404).json({ error: 'Archived task not found.' });
+    if (!canAccessTask(archived, req.user)) {
+      return res.status(403).json({ error: 'Not authorized.' });
+    }
+
+    const taskData = {
+      title: archived.title,
+      description: archived.description || '',
+      status: archived.status,
+      priority: archived.priority,
+      dueDate: archived.dueDate || null,
+      project: archived.project?._id || archived.project || null,
+      assignedTo: archived.assignedTo?._id || archived.assignedTo || null,
+      assignedRole: archived.assignedRole || null,
+      collaborators: Array.isArray(archived.collaborators)
+        ? archived.collaborators.map((c) => (c && c._id ? c._id : c)).filter(Boolean)
+        : [],
+      collaboratorRoles: Array.isArray(archived.collaboratorRoles) ? archived.collaboratorRoles : [],
+      isGlobal: !!archived.isGlobal,
+      subtasks: Array.isArray(archived.subtasks)
+        ? archived.subtasks.map((s) => ({
+            title: s.title,
+            done: !!s.done,
+            assignedTo: s.assignedTo?._id || s.assignedTo || undefined,
+          }))
+        : [],
+      createdBy: archived.createdBy?._id || archived.createdBy,
+      order: 0,
+    };
+
+    const task = await Task.create(taskData);
+
+    await addActivity(task._id, req.user.userId, 'unarchive', 'Task restored from archive');
+    await logHistory({
+      userId: req.user.userId,
+      action: 'create',
+      entityType: 'Task',
+      entityId: task._id,
+      newValue: task.toObject(),
+      description: `Unarchived task: ${task.title}`,
+    });
+
+    await TaskArchive.deleteOne({ _id: archived._id });
+
+    const populated = await Task.findById(task._id)
+      .populate('assignedTo', 'name email role')
+      .populate('collaborators', 'name email role')
+      .populate('createdBy', 'name email role')
+      .populate('project', 'name');
+    res.json({ task: populated });
+  } catch (err) {
+    next(err);
+  }
+};

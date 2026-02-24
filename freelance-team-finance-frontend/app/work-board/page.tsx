@@ -25,7 +25,8 @@ import {
   LayoutGrid,
   List,
   Eye,
-  Archive
+  Archive,
+  ArchiveRestore
 } from "lucide-react"
 
 interface UserItem {
@@ -326,6 +327,17 @@ export default function WorkBoardPage() {
       await fetchArchivedTasks()
     } catch (error) {
       console.error("Failed to archive task:", error)
+    }
+  }
+
+  const handleUnarchive = async (task: TaskItem) => {
+    if (!window.confirm(`Restore "${task.title}" to active tasks?`)) return
+    try {
+      await apiClient.unarchiveTask(task._id)
+      await fetchTasks()
+      await fetchArchivedTasks()
+    } catch (error) {
+      console.error("Failed to unarchive task:", error)
     }
   }
 
@@ -723,6 +735,12 @@ export default function WorkBoardPage() {
                             {activeScope === "active" && task.status === "done" && (
                               <ModernButton variant="outline" size="sm" onClick={() => handleArchive(task)}>
                                 <Archive className="h-4 w-4" />
+                              </ModernButton>
+                            )}
+                            {activeScope === "archived" && (
+                              <ModernButton variant="outline" size="sm" onClick={() => handleUnarchive(task)} title="Restore to active tasks">
+                                <ArchiveRestore className="h-4 w-4" />
+                                Unarchive
                               </ModernButton>
                             )}
                             {activeScope === "active" && (

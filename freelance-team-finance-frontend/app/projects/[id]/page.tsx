@@ -33,8 +33,7 @@ interface Platform { _id: string; name: string }
 interface Project {
   _id: string; name: string; clientName: string; platform: Platform | string
   currency: string; status: string; startDate?: string; endDate?: string
-  priceType: string; fixedPrice?: number; hourlyRate?: number
-  platformCharge: number; conversionRate: number
+  priceType: string; fixedPrice?: number; hourlyRate?: number; budget?: number
 }
 
 interface Payment {
@@ -109,6 +108,13 @@ export default function ModernProjectDetailPage() {
   const totalEarned = Array.isArray(payments)
     ? payments.reduce((sum, payment) => sum + (payment.amountInINR || 0), 0)
     : 0
+  const totalPaymentAmount = Array.isArray(payments)
+    ? payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
+    : 0
+  const projectBudget = project?.priceType === "fixed"
+    ? (project?.fixedPrice ?? 0)
+    : (project?.budget ?? 0)
+  const paymentRemaining = Math.max(0, projectBudget - totalPaymentAmount)
 
   const totalHours = hourlyWork.reduce((sum, log) => sum + log.hours, 0)
   const billedHours = hourlyWork.filter(log => log.billed).reduce((sum, log) => sum + log.hours, 0)
@@ -177,7 +183,24 @@ export default function ModernProjectDetailPage() {
         </div>
 
         {/* Project Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <ModernCard className="border-amber-200 bg-amber-50/50">
+            <ModernCardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <ModernCardTitle className="text-lg">Payment Remaining</ModernCardTitle>
+                  <p className="text-gray-600 text-sm">Budget − Payments in</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-amber-500" />
+              </div>
+            </ModernCardHeader>
+            <ModernCardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {projectBudget > 0 ? `${project.currency} ${paymentRemaining.toLocaleString()}` : "—"}
+              </div>
+            </ModernCardContent>
+          </ModernCard>
+
           <ModernCard variant="gradient">
             <ModernCardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -249,7 +272,7 @@ export default function ModernProjectDetailPage() {
             <ModernCardTitle className="text-xl">Project Information</ModernCardTitle>
           </ModernCardHeader>
           <ModernCardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-gray-600">
                   <Globe className="h-4 w-4" />
@@ -277,7 +300,7 @@ export default function ModernProjectDetailPage() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-gray-600">
                   <TrendingUp className="h-4 w-4" />
-                  <span className="text-sm font-medium">Rate</span>
+                  <span className="text-sm font-medium">Rate to budget</span>
                 </div>
                 <p className="text-gray-900 font-semibold">
                   {project.priceType === "fixed" && project.fixedPrice !== undefined
@@ -305,26 +328,6 @@ export default function ModernProjectDetailPage() {
                 </div>
                 <p className="text-gray-900 font-semibold">
                   {project.endDate ? formatDateDDMMYYYY(project.endDate) : "Ongoing"}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="text-sm font-medium">Platform Charge</span>
-                </div>
-                <p className="text-gray-900 font-semibold">
-                  {project.platformCharge !== undefined ? `${project.platformCharge}%` : "—"}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <DollarSign className="h-4 w-4" />
-                  <span className="text-sm font-medium">Conversion Rate</span>
-                </div>
-                <p className="text-gray-900 font-semibold">
-                  {project.conversionRate !== undefined ? project.conversionRate : "—"}
                 </p>
               </div>
             </div>

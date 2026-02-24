@@ -75,7 +75,69 @@ exports.login = async (req, res, next) => {
     res.json({
       token,
       user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      hasPin: !!user.pinHash,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const hasPin = !!user.pinHash;
+    res.json({
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      hasPin,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.setPin = async (req, res, next) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || typeof pin !== 'string') {
+      return res.status(400).json({ error: 'PIN is required.' });
+    }
+    const trimmed = pin.trim();
+    if (!/^\d{4}$/.test(trimmed)) {
+      return res.status(400).json({ error: 'PIN must be exactly 4 digits.' });
+    }
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const pinHash = await bcrypt.hash(trimmed, 10);
+    user.pinHash = pinHash;
+    await user.save();
+    await logHistory({
+      userId: req.user.userId,
+      action: 'update',
+      entityType: 'User',
+      entityId: user._id,
+      description: 'User set or updated session PIN',
+    });
+    res.json({ message: 'PIN set successfully.', hasPin: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.verifyPin = async (req, res, next) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || typeof pin !== 'string') {
+      return res.status(400).json({ error: 'PIN is required.' });
+    }
+    const user = await User.findById(req.user.userId).select('pinHash');
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (!user.pinHash) {
+      return res.status(400).json({ error: 'No PIN set. Set a PIN in Profile first.' });
+    }
+    const match = await bcrypt.compare(pin.trim(), user.pinHash);
+    if (!match) return res.status(400).json({ error: 'Incorrect PIN.' });
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

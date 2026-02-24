@@ -8,6 +8,7 @@ router.post('/', auth, allow('admin', 'owner', 'sales', 'developer'), taskContro
 router.get('/', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getTasks);
 router.get('/archived', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getArchivedTasks);
 router.get('/archived/:id', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getArchivedTaskById);
+router.post('/archived/:id/unarchive', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.unarchiveTask);
 router.post('/:id/archive', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.archiveTask);
 router.get('/:id/comments', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getComments);
 router.post('/:id/comments', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.addComment);

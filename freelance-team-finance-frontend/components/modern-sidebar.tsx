@@ -116,20 +116,22 @@ export function ModernSidebar() {
 
       {/* User Profile */}
       <div className="p-4 border-t border-white/10 flex-shrink-0">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/10 backdrop-blur-sm">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
-            {user?.name?.charAt(0)?.toUpperCase()}
-          </div>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-medium text-sm truncate">{user?.name}</p>
-              <p className="text-white/70 text-xs truncate">{user?.email}</p>
-              <ModernBadge variant="success" size="sm" className="mt-1">
-                {user?.role}
-              </ModernBadge>
+        <Link href="/profile" className="block">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/15 transition-colors cursor-pointer">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+              {user?.name?.charAt(0)?.toUpperCase()}
             </div>
-          )}
-        </div>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium text-sm truncate">{user?.name}</p>
+                <p className="text-white/70 text-xs truncate">{user?.email}</p>
+                <ModernBadge variant="success" size="sm" className="mt-1">
+                  {user?.role}
+                </ModernBadge>
+              </div>
+            )}
+          </div>
+        </Link>
         <ModernButton
           variant="ghost"
           className="w-full mt-3 text-white/80 hover:text-white hover:bg-white/10"
