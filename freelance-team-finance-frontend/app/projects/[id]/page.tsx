@@ -114,7 +114,10 @@ export default function ModernProjectDetailPage() {
   const projectBudget = project?.priceType === "fixed"
     ? (project?.fixedPrice ?? 0)
     : (project?.budget ?? 0)
-  const paymentRemaining = Math.max(0, projectBudget - totalPaymentAmount)
+  const paymentDifference = projectBudget - totalPaymentAmount
+  const isOverPaid = projectBudget > 0 && paymentDifference < 0
+  const paymentRemaining = Math.max(0, paymentDifference)
+  const overPaidAmount = isOverPaid ? Math.abs(paymentDifference) : 0
 
   const totalHours = hourlyWork.reduce((sum, log) => sum + log.hours, 0)
   const billedHours = hourlyWork.filter(log => log.billed).reduce((sum, log) => sum + log.hours, 0)
@@ -184,19 +187,27 @@ export default function ModernProjectDetailPage() {
 
         {/* Project Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <ModernCard className="border-amber-200 bg-amber-50/50">
+          <ModernCard className={isOverPaid ? "border-emerald-200 bg-emerald-50/50" : "border-amber-200 bg-amber-50/50"}>
             <ModernCardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <ModernCardTitle className="text-lg">Payment Remaining</ModernCardTitle>
-                  <p className="text-gray-600 text-sm">Budget − Payments in</p>
+                  <ModernCardTitle className="text-lg">
+                    {isOverPaid ? "Over paid" : "Payment Remaining"}
+                  </ModernCardTitle>
+                  <p className="text-gray-600 text-sm">
+                    {isOverPaid ? "Client paid more than budget" : "Budget − Payments in"}
+                  </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-amber-500" />
+                <TrendingUp className={`h-8 w-8 ${isOverPaid ? "text-emerald-500" : "text-amber-500"}`} />
               </div>
             </ModernCardHeader>
             <ModernCardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {projectBudget > 0 ? `${project.currency} ${paymentRemaining.toLocaleString()}` : "—"}
+              <div className={`text-2xl font-bold ${isOverPaid ? "text-emerald-700" : "text-gray-900"}`}>
+                {projectBudget > 0
+                  ? isOverPaid
+                    ? `${project.currency} ${overPaidAmount.toLocaleString()}`
+                    : `${project.currency} ${paymentRemaining.toLocaleString()}`
+                  : "—"}
               </div>
             </ModernCardContent>
           </ModernCard>
