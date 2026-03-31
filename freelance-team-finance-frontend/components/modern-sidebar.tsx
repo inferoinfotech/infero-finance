@@ -60,18 +60,18 @@ export function ModernSidebar() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className={`border-b border-white/10 flex-shrink-0 ${isCollapsed ? 'p-1.5' : 'p-2.5'}`}>
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-start pl-6 py-2 bg-white rounded-md">
           {isCollapsed ? (
             <img 
-              src="/keviot-logo.png" 
+              src="/keviot-favicon.png" 
               alt="Keviot Tech Logo" 
-              className="w-24 h-24 object-contain"
+              className="w-24 h-16 object-contain p-2"
             />
           ) : (
             <img 
               src="/keviot-logo.png" 
               alt="Keviot Tech" 
-              className="h-24 w-auto object-contain max-w-full"
+              className="h-16 w-auto  object-contain max-w-full"
             />
           )}
         </div>
