@@ -47,9 +47,17 @@ export default function ModernLoginPage() {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8 animate-fade-in">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white text-2xl font-bold">K</span>
-          </div>
+        <div className={`border-b border-white/10 flex-shrink-0 p-2.5`}>
+        <div className="flex items-center justify-center pl-6 py-2">
+         
+            <img 
+              src="/keviot-logo.png" 
+              alt="Keviot Tech" 
+              className="h-16 w-auto  object-contain max-w-full"
+            />
+
+        </div>
+      </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
           <p className="text-gray-600">Sign in to your Keviot Tech account</p>
         </div>
