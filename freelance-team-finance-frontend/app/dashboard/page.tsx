@@ -204,7 +204,7 @@ export default function ModernDashboardPage() {
               <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
                 <Users className="w-12 h-12 text-white" />
               </div>
-              <ModernCardTitle className="text-3xl">Welcome to Infero Infotech! 👋</ModernCardTitle>
+              <ModernCardTitle className="text-3xl">Welcome to Keviot Tech! 👋</ModernCardTitle>
             </ModernCardHeader>
             <ModernCardContent className="space-y-4">
               <p className="text-gray-600 text-lg">

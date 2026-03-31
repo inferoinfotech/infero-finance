@@ -77,7 +77,7 @@ export default function ProfilePage() {
             <p className="text-sm text-gray-600 mb-4">
               {hasPin
                 ? "Set a new 4-digit PIN to lock the panel after 15 minutes of inactivity. Enter the same PIN to unlock."
-                : "Set a 4-digit PIN to lock the panel after 15 minutes of inactivity. This adds extra security for your finance data."}
+                : "Set a 4-digit PIN to lock the panel after 15 minutes of inactivity. This adds extra security for your team data."}
             </p>
             <form onSubmit={handleSetPin} className="space-y-4">
               <div>

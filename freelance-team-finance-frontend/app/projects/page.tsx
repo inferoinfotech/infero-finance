@@ -174,7 +174,7 @@ export default function ModernProjectsPage() {
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Project Portfolio</h1>
             <p className="text-gray-600 text-lg">
-              Manage and track all your freelancing projects in one place
+              Manage and track all your team projects in one place
             </p>
           </div>
           <Link href="/projects/create">

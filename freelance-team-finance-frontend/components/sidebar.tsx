@@ -37,7 +37,7 @@ export function Sidebar() {
   return (
     <div className="flex flex-col w-64 bg-gray-900 text-white min-h-screen">
       <div className="flex items-center justify-center h-16">
-        <img src="/infero.png" alt="FreelanceTeam Logo" className="h-14" />
+        <img src="/keviot-logo.png" alt="Keviot Tech Logo" className="h-14" />
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-2">

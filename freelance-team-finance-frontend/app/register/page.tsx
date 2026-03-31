@@ -77,16 +77,16 @@ export default function ModernRegisterPage() {
         {/* Logo/Brand */}
         <div className="text-center mb-8 animate-fade-in">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white text-2xl font-bold">I</span>
+            <span className="text-white text-2xl font-bold">K</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Join Infero Infotech</h1>
-          <p className="text-gray-600">Create your account and start managing your freelance business</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Join Keviot Tech</h1>
+          <p className="text-gray-600">Create your account and start managing your team projects</p>
         </div>
 
         <ModernCard className="animate-slide-up">
           <ModernCardHeader className="text-center pb-2">
             <ModernCardTitle className="text-2xl">Create Account</ModernCardTitle>
-            <p className="text-gray-600 mt-2">Join our freelancing management platform</p>
+            <p className="text-gray-600 mt-2">Join our team project management platform</p>
           </ModernCardHeader>
           
           <ModernCardContent className="space-y-6">
@@ -244,7 +244,7 @@ export default function ModernRegisterPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500 animate-fade-in">
-          <p>&copy; 2024 Infero Infotech. All rights reserved.</p>
+          <p>&copy; 2024 Keviot Tech. All rights reserved.</p>
         </div>
       </div>
     </div>

@@ -48,10 +48,10 @@ export default function ModernLoginPage() {
         {/* Logo/Brand */}
         <div className="text-center mb-8 animate-fade-in">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-            <span className="text-white text-2xl font-bold">I</span>
+            <span className="text-white text-2xl font-bold">K</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your Infero Infotech account</p>
+          <p className="text-gray-600">Sign in to your Keviot Tech account</p>
         </div>
 
         <ModernCard className="animate-slide-up">
@@ -140,7 +140,7 @@ export default function ModernLoginPage() {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="bg-white px-2 text-gray-500">New to Infero Infotech?</span>
+                <span className="bg-white px-2 text-gray-500">New to Keviot Tech?</span>
               </div>
             </div>
 
@@ -154,7 +154,7 @@ export default function ModernLoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500 animate-fade-in">
-          <p>&copy; 2024 Infero Infotech. All rights reserved.</p>
+          <p>&copy; 2024 Keviot Tech. All rights reserved.</p>
         </div>
       </div>
     </div>

@@ -156,7 +156,7 @@ export default function ModernPlatformsPage() {
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Platform Management</h1>
             <p className="text-gray-600 text-lg">
-              Manage your freelancing platforms and their configurations
+              Manage your work platforms and their configurations
             </p>
           </div>
           <ModernButton onClick={() => setShowAddForm(true)}>
@@ -284,7 +284,7 @@ export default function ModernPlatformsPage() {
                   <Settings className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">No platforms found</h3>
                   <p className="text-gray-500 mb-6">
-                    Get started by adding your first freelancing platform
+                    Get started by adding your first work platform
                   </p>
                   <ModernButton onClick={() => setShowAddForm(true)}>
                     <Plus className="h-4 w-4" />

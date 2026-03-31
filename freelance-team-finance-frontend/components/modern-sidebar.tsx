@@ -59,26 +59,29 @@ export function ModernSidebar() {
   const SidebarContent = () => (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className={`border-b border-white/10 flex-shrink-0 ${isCollapsed ? 'p-4' : 'p-6'}`}>
+      <div className={`border-b border-white/10 flex-shrink-0 ${isCollapsed ? 'p-1.5' : 'p-2.5'}`}>
         <div className="flex items-center justify-center">
           {isCollapsed ? (
             <img 
-              src="/logo.png" 
-              alt="Infero Logo" 
-              className="w-16 h-16 object-contain"
+              src="/keviot-logo.png" 
+              alt="Keviot Tech Logo" 
+              className="w-24 h-24 object-contain"
             />
           ) : (
             <img 
-              src="/logo.png" 
-              alt="Infero Infotech Solutions" 
-              className="h-16 w-auto object-contain max-w-full"
+              src="/keviot-logo.png" 
+              alt="Keviot Tech" 
+              className="h-24 w-auto object-contain max-w-full"
             />
           )}
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+      <nav
+        className="flex-1 p-4 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
         {items.map((item) => {
           const isActive = pathname === item.href
           return (

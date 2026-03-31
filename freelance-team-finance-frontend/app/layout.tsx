@@ -8,11 +8,11 @@ import { PinLockProvider } from "@/contexts/pin-lock-context"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Freelancing Management System",
-  description: "Team-based freelancing management platform",
+  title: "Keviot Team",
+  description: "Keviot Tech team project management platform",
   icons: {
-    icon: '/favicon.ico',
-    apple: '/favicon.ico',
+    icon: '/keviot-favicon.png',
+    apple: '/keviot-favicon.png',
   },
 }
 
