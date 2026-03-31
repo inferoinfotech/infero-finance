@@ -124,6 +124,56 @@ class ApiClient {
     })
   }
 
+  // Assets endpoints
+  async getAssets() {
+    return this.request("/api/assets")
+  }
+
+  async createAsset(assetData: any) {
+    return this.request("/api/assets", {
+      method: "POST",
+      body: JSON.stringify(assetData),
+    })
+  }
+
+  async updateAsset(assetId: string, assetData: any) {
+    return this.request(`/api/assets/${assetId}`, {
+      method: "PUT",
+      body: JSON.stringify(assetData),
+    })
+  }
+
+  async deleteAsset(assetId: string) {
+    return this.request(`/api/assets/${assetId}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Asset Types endpoints
+  async getAssetTypes() {
+    return this.request("/api/asset-types")
+  }
+
+  async createAssetType(typeData: { name: string; description?: string }) {
+    return this.request("/api/asset-types", {
+      method: "POST",
+      body: JSON.stringify(typeData),
+    })
+  }
+
+  async updateAssetType(typeId: string, typeData: { name: string; description?: string }) {
+    return this.request(`/api/asset-types/${typeId}`, {
+      method: "PUT",
+      body: JSON.stringify(typeData),
+    })
+  }
+
+  async deleteAssetType(typeId: string) {
+    return this.request(`/api/asset-types/${typeId}`, {
+      method: "DELETE",
+    })
+  }
+
   // Expense Categories endpoints
   async getExpenseCategories() {
     return this.request("/api/expense-categories")
@@ -345,6 +395,10 @@ async getGeneralExpensesReport(groupBy: "month" | "day" = "month") {
       })
     }
     return this.request(`/api/tasks${qs.toString() ? `?${qs}` : ""}`)
+  }
+
+  async getTaskUsers() {
+    return this.request("/api/tasks/users")
   }
 
   async getTask(id: string) {

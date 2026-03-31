@@ -141,7 +141,7 @@ export default function WorkBoardPage() {
 
   const fetchUsers = async () => {
     try {
-      const data = await apiClient.getUsers({ limit: 200 })
+      const data = await apiClient.getTaskUsers()
       setUsers(Array.isArray(data.users) ? data.users : [])
     } catch (error) {
       console.error("Failed to fetch users:", error)
@@ -162,9 +162,7 @@ export default function WorkBoardPage() {
     return projects.filter((p) => p.status === projectStatusFilter)
   }, [projects, projectStatusFilter])
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((u) => u.role !== "admin")
-  }, [users])
+  const filteredUsers = useMemo(() => users, [users])
 
   const fetchTasks = async () => {
     try {

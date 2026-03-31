@@ -19,7 +19,8 @@ import {
   Users,
   FolderOpen,
   Target,
-  Award
+  Award,
+  Building2,
 } from "lucide-react"
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, PieChart, Pie, Cell } from "recharts"
 import { cn } from "@/lib/utils"
@@ -87,6 +88,10 @@ export default function ModernDashboardPage() {
   )
   const { data: generalRaw, isLoading: generalLoading, error: generalError } = useSWR<any[]>(
     isAdminOwner ? "/api/reports/general-expenses?groupBy=month" : null,
+    swrFetcher
+  )
+  const { data: assetsSummary, isLoading: assetsSummaryLoading } = useSWR<any>(
+    isAdminOwner ? "/api/assets/summary" : null,
     swrFetcher
   )
 
@@ -181,7 +186,7 @@ export default function ModernDashboardPage() {
     return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month))
   }, [income, general])
 
-  const loading = isAdminOwner && (accountsLoading || incomeLoading || expensesLoading || generalLoading)
+  const loading = isAdminOwner && (accountsLoading || incomeLoading || expensesLoading || generalLoading || assetsSummaryLoading)
 
   // Sample pie chart data
   const pieData = [
@@ -304,6 +309,15 @@ export default function ModernDashboardPage() {
                 subtitle="Income - General Expenses"
                 icon={<IndianRupee className="w-6 h-6 text-emerald-600" />}
                 variant={revenue >= 0 ? "success" : "destructive"}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-6">
+              <StatCard
+                title="Assets Current Value"
+                value={assetsSummary?.totalCurrentValue || 0}
+                subtitle="Sum of asset holdings (currentValue)"
+                icon={<Building2 className="w-6 h-6 text-yellow-600" />}
               />
             </div>
           </section>

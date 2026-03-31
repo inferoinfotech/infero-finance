@@ -75,7 +75,7 @@ export default function WorkBoardTaskDetailPage() {
 
   const fetchUsers = async () => {
     try {
-      const data = await apiClient.getUsers({ limit: 200 })
+      const data = await apiClient.getTaskUsers()
       setUsers(Array.isArray(data.users) ? data.users : [])
     } catch (error) {
       console.error("Failed to fetch users:", error)

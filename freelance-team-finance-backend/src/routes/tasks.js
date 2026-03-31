@@ -6,6 +6,7 @@ const taskController = require('../controllers/taskController');
 
 router.post('/', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.createTask);
 router.get('/', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getTasks);
+router.get('/users', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getTaskUsers);
 router.get('/archived', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getArchivedTasks);
 router.get('/archived/:id', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.getArchivedTaskById);
 router.post('/archived/:id/unarchive', auth, allow('admin', 'owner', 'sales', 'developer'), taskController.unarchiveTask);

@@ -49,9 +49,18 @@ function canAccessTask(task, user) {
   if (!user) return false;
   if (user.role === ROLES.ADMIN) return true;
   const userId = user.userId?.toString();
-  const assignedToId = task.assignedTo?.toString();
-  const createdById = task.createdBy?.toString();
-  const collaboratorIds = (task.collaborators || []).map((c) => c.toString());
+  const toId = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (value._id) return value._id.toString();
+    if (typeof value.toString === 'function') return value.toString();
+    return null;
+  };
+  const assignedToId = toId(task.assignedTo);
+  const createdById = toId(task.createdBy);
+  const collaboratorIds = (task.collaborators || [])
+    .map((c) => toId(c))
+    .filter(Boolean);
   return (
     task.isGlobal === true ||
     createdById === userId ||
@@ -61,6 +70,20 @@ function canAccessTask(task, user) {
     (task.collaboratorRoles || []).includes(user.role)
   );
 }
+
+// GET /api/tasks/users
+// Scoped user list for task assignment/collaboration selectors.
+exports.getTaskUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({}, { name: 1, email: 1, role: 1 })
+      .sort({ name: 1 })
+      .lean();
+
+    res.json({ users });
+  } catch (err) {
+    next(err);
+  }
+};
 
 exports.createTask = async (req, res, next) => {
   try {
