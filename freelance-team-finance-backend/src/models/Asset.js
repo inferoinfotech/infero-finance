@@ -23,6 +23,9 @@ const assetSchema = new mongoose.Schema({
   // Value displayed on the Assets page (not currently tied to ledger postings).
   currentValue: { type: Number, required: true },
 
+  // Asset date (e.g., purchase/entry date) used for filtering/reporting
+  date: { type: Date, default: Date.now },
+
   createdAt: { type: Date, default: Date.now },
 })
 

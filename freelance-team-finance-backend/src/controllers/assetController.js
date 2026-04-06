@@ -22,7 +22,7 @@ function normalizeAssetFields(body) {
 // POST /api/assets
 exports.createAsset = async (req, res, next) => {
   try {
-    const { name, type, accountType, accountId, note, amount, currentValue } = req.body
+    const { name, type, accountType, accountId, note, amount, currentValue, date } = req.body
 
     const amt = toNumberOrNull(amount)
     const curVal = toNumberOrNull(currentValue)
@@ -32,6 +32,11 @@ exports.createAsset = async (req, res, next) => {
     if (!accountType) return res.status(400).json({ error: 'Account type is required' })
     if (amt === null || amt <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' })
     if (curVal === null || curVal < 0) return res.status(400).json({ error: 'Current value must be >= 0' })
+
+    const assetDate = date ? new Date(date) : new Date()
+    if (date && Number.isNaN(assetDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date' })
+    }
 
     const account = await Account.findOne({ _id: accountId, type: accountType })
     if (!account) return res.status(404).json({ error: 'Selected account not found' })
@@ -45,6 +50,7 @@ exports.createAsset = async (req, res, next) => {
       note: note || '',
       amount: amt,
       currentValue: curVal,
+      date: assetDate,
     })
 
     // Ledger integration: debit the selected account by `amount`
@@ -135,6 +141,15 @@ exports.updateAsset = async (req, res, next) => {
 
     const hasAmount = 'amount' in updates
     const hasAccount = 'account' in updates
+    const hasDate = 'date' in updates
+
+    if (hasDate) {
+      const d = updates.date ? new Date(updates.date) : null
+      if (!d || Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: 'Invalid date' })
+      }
+      updates.date = d
+    }
 
     const newAmount = hasAmount ? toNumberOrNull(updates.amount) : oldAsset.amount
     if (hasAmount && (newAmount === null || newAmount <= 0)) {

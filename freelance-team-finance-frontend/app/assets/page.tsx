@@ -30,6 +30,7 @@ interface Asset {
   note?: string
   amount: number
   currentValue: number
+  date?: string
   createdAt?: string
 }
 
@@ -73,6 +74,7 @@ export default function AssetsPage() {
     note: "",
     amount: "",
     currentValue: "",
+    date: "",
   })
 
   const accountOptions = useMemo(() => {
@@ -160,6 +162,7 @@ export default function AssetsPage() {
       note: "",
       amount: "",
       currentValue: "",
+      date: "",
     })
   }
 
@@ -192,7 +195,7 @@ export default function AssetsPage() {
       const matchesAccountType = !accountType || (a.account?.type || a.accountType) === accountType
       const matchesAccount = !accountId || a.account?._id === accountId
 
-      const assetTs = a.createdAt ? new Date(a.createdAt).getTime() : null
+      const assetTs = (a.date || a.createdAt) ? new Date(a.date || a.createdAt || "").getTime() : null
       const matchesFrom = fromTs === null || (assetTs !== null && assetTs >= fromTs)
       const matchesTo = toTs === null || (assetTs !== null && assetTs <= toTs)
 
@@ -284,6 +287,7 @@ export default function AssetsPage() {
       note: asset.note || "",
       amount: asset.amount != null ? String(asset.amount) : "",
       currentValue: asset.currentValue != null ? String(asset.currentValue) : "",
+      date: asset.date ? String(asset.date).slice(0, 10) : "",
     })
     setShowAddForm(true)
   }
@@ -318,6 +322,7 @@ export default function AssetsPage() {
         note: formData.note || "",
         amount: Number(formData.amount),
         currentValue: Number(formData.currentValue),
+        date: formData.date || undefined,
       }
 
       if (editingAsset) {
@@ -713,6 +718,14 @@ export default function AssetsPage() {
                     ...accountOptions,
                   ]}
                   error={errors.accountId}
+                />
+
+                <ModernInput
+                  label="Asset Date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  icon={<Calendar className="h-4 w-4" />}
                 />
 
                 <ModernInput
