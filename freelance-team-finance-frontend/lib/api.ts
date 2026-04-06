@@ -224,6 +224,80 @@ class ApiClient {
     })
   }
 
+  async transferBankToBank(transferData: { fromBankId: string; toBankId: string; amount: number }) {
+    return this.request("/api/accounts/transfer/bank", {
+      method: "POST",
+      body: JSON.stringify(transferData),
+    })
+  }
+
+  // To-do endpoints (per-user)
+  async getTodos() {
+    return this.request("/api/todos")
+  }
+
+  async createTodo(todoData: { text: string }) {
+    return this.request("/api/todos", {
+      method: "POST",
+      body: JSON.stringify(todoData),
+    })
+  }
+
+  async updateTodo(todoId: string, todoData: { text?: string; done?: boolean }) {
+    return this.request(`/api/todos/${todoId}`, {
+      method: "PUT",
+      body: JSON.stringify(todoData),
+    })
+  }
+
+  async deleteTodo(todoId: string) {
+    return this.request(`/api/todos/${todoId}`, {
+      method: "DELETE",
+    })
+  }
+
+  async reorderTodos(orderedIds: string[]) {
+    return this.request("/api/todos/reorder", {
+      method: "PATCH",
+      body: JSON.stringify({ orderedIds }),
+    })
+  }
+
+  // Sticky Notes endpoints (per-user)
+  async getStickyNotes() {
+    return this.request("/api/sticky-notes")
+  }
+
+  async createStickyNote(noteData: { title?: string; content: string; color?: string; pinned?: boolean }) {
+    return this.request("/api/sticky-notes", {
+      method: "POST",
+      body: JSON.stringify(noteData),
+    })
+  }
+
+  async updateStickyNote(
+    noteId: string,
+    noteData: { title?: string; content?: string; color?: string; pinned?: boolean },
+  ) {
+    return this.request(`/api/sticky-notes/${noteId}`, {
+      method: "PUT",
+      body: JSON.stringify(noteData),
+    })
+  }
+
+  async deleteStickyNote(noteId: string) {
+    return this.request(`/api/sticky-notes/${noteId}`, {
+      method: "DELETE",
+    })
+  }
+
+  async reorderStickyNotes(orderedIds: string[]) {
+    return this.request("/api/sticky-notes/reorder", {
+      method: "PATCH",
+      body: JSON.stringify({ orderedIds }),
+    })
+  }
+
   // Platforms endpoints
   async getPlatforms() {
     return this.request("/api/platforms")

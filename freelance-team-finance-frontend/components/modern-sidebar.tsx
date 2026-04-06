@@ -11,11 +11,11 @@ import {
   Settings, 
   History, 
   ClipboardList,
+  ListTodo,
   Bell, 
   FileText, 
   Building2,
   LogOut,
-  User,
   ChevronDown,
   Menu,
   X
@@ -30,6 +30,7 @@ const navigation = [
   { name: "Leads", href: "/leads", icon: FileText, color: "text-green-600" },
   { name: "Projects", href: "/projects", icon: FolderOpen, color: "text-purple-600" },
   { name: "Work Board", href: "/work-board", icon: ClipboardList, color: "text-cyan-600" },
+  { name: "To-do / Sticky", href: "/todo-sticky", icon: ListTodo, color: "text-pink-600" },
   { name: "Expenses", href: "/expenses", icon: Receipt, color: "text-orange-600" },
   { name: "Assets", href: "/assets", icon: Building2, color: "text-yellow-600" },
   { name: "Accounts", href: "/accounts", icon: Wallet, color: "text-teal-600" },
@@ -41,8 +42,8 @@ const navigation = [
 
 function itemsForRole(role?: Role) {
   if (!role) return []
-  if (role === "sales") return navigation.filter((n) => ["Leads", "Work Board"].includes(n.name))
-  if (role === "developer") return navigation.filter((n) => n.name === "Work Board")
+  if (role === "sales") return navigation.filter((n) => ["Leads", "Work Board", "To-do / Sticky"].includes(n.name))
+  if (role === "developer") return navigation.filter((n) => ["Work Board", "To-do / Sticky"].includes(n.name))
   // admin & owner get everything
   if (role === "admin" || role === "owner") return navigation
   return []

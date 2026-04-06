@@ -27,7 +27,7 @@ export default function ModernLoginPage() {
 
     try {
       await login(email, password)
-      router.push("/dashboard")
+      router.push("/todo-sticky")
     } catch (err) {
       setError("Invalid email or password. Please check your credentials and try again.")
     } finally {

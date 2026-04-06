@@ -19,6 +19,8 @@ const expenseReportsRoutes = require('./routes/expenseReports');
 const comprehensiveReportsRoutes = require('./routes/comprehensiveReports');
 const leadsRoutes = require('./routes/leads');
 const tasksRoutes = require('./routes/tasks');
+const todosRoutes = require('./routes/todos');
+const stickyNotesRoutes = require('./routes/stickyNotes');
 const app = express();
 
 // Middleware
@@ -49,6 +51,8 @@ app.use('/api/reports', require('./routes/report'));
 app.use('/api/comprehensive-reports', comprehensiveReportsRoutes);
 app.use('/api/leads', leadsRoutes);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/todos', todosRoutes);
+app.use('/api/sticky-notes', stickyNotesRoutes);
 app.get('/health', (req, res) => res.status(200).send('api is healthy'));
 
 // Global error handler

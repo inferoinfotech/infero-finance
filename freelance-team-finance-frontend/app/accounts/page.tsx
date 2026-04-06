@@ -89,6 +89,7 @@ export default function ModernAccountsPage() {
   const [downloading, setDownloading] = useState<string | null>(null)
   const [showTransferModal, setShowTransferModal] = useState(false)
   const [transferring, setTransferring] = useState(false)
+  const [transferTab, setTransferTab] = useState<"walletToBank" | "bankToBank">("walletToBank")
   const [transferFormData, setTransferFormData] = useState({
     walletId: "",
     bankId: "",
@@ -96,6 +97,12 @@ export default function ModernAccountsPage() {
     conversionRate: "",
   })
   const [transferErrors, setTransferErrors] = useState<Record<string, string>>({})
+  const [bankTransferFormData, setBankTransferFormData] = useState({
+    fromBankId: "",
+    toBankId: "",
+    amount: "",
+  })
+  const [bankTransferErrors, setBankTransferErrors] = useState<Record<string, string>>({})
 
   const {
     data: statement,
@@ -779,9 +786,37 @@ export default function ModernAccountsPage() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold">Transfer Money</DialogTitle>
-              <p className="text-gray-600">Transfer money from wallet to bank account</p>
+              <p className="text-gray-600">
+                {transferTab === "walletToBank"
+                  ? "Transfer money from wallet to bank account"
+                  : "Transfer money from one bank account to another"}
+              </p>
             </DialogHeader>
+
+            <div className="flex gap-2 my-4">
+              <ModernButton
+                type="button"
+                variant={transferTab === "walletToBank" ? "default" : "outline"}
+                onClick={() => {
+                  setTransferTab("walletToBank")
+                  setTransferErrors({})
+                }}
+              >
+                Wallet → Bank
+              </ModernButton>
+              <ModernButton
+                type="button"
+                variant={transferTab === "bankToBank" ? "default" : "outline"}
+                onClick={() => {
+                  setTransferTab("bankToBank")
+                  setBankTransferErrors({})
+                }}
+              >
+                Bank → Bank
+              </ModernButton>
+            </div>
             
+            {transferTab === "walletToBank" && (
             <form onSubmit={async (e) => {
               e.preventDefault()
               
@@ -950,6 +985,128 @@ export default function ModernAccountsPage() {
                 </ModernButton>
               </div>
             </form>
+            )}
+
+            {transferTab === "bankToBank" && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault()
+
+                  const newErrors: Record<string, string> = {}
+                  if (!bankTransferFormData.fromBankId) newErrors.fromBankId = "Please select a from bank account"
+                  if (!bankTransferFormData.toBankId) newErrors.toBankId = "Please select a to bank account"
+                  if (
+                    bankTransferFormData.fromBankId &&
+                    bankTransferFormData.toBankId &&
+                    bankTransferFormData.fromBankId === bankTransferFormData.toBankId
+                  ) {
+                    newErrors.toBankId = "From and To bank accounts must be different"
+                  }
+                  if (!bankTransferFormData.amount || Number(bankTransferFormData.amount) <= 0) {
+                    newErrors.amount = "Amount must be greater than 0"
+                  }
+
+                  setBankTransferErrors(newErrors)
+                  if (Object.keys(newErrors).length > 0) return
+
+                  setTransferring(true)
+                  try {
+                    await apiClient.transferBankToBank({
+                      fromBankId: bankTransferFormData.fromBankId,
+                      toBankId: bankTransferFormData.toBankId,
+                      amount: Number(bankTransferFormData.amount),
+                    })
+
+                    alert(`Successfully transferred ₹${Number(bankTransferFormData.amount).toLocaleString()} between bank accounts`)
+                    setShowTransferModal(false)
+                    setBankTransferFormData({ fromBankId: "", toBankId: "", amount: "" })
+                    setBankTransferErrors({})
+                    await fetchAccounts()
+                  } catch (error: any) {
+                    console.error("Bank transfer failed:", error)
+                    const errorMessage =
+                      error?.message || error?.error || "Failed to transfer money between banks. Please try again."
+                    setBankTransferErrors({ submit: errorMessage })
+                  } finally {
+                    setTransferring(false)
+                  }
+                }}
+                className="space-y-6"
+              >
+                {bankTransferErrors.submit && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl">
+                    {bankTransferErrors.submit}
+                  </div>
+                )}
+
+                <ModernSelect
+                  label="From Bank Account *"
+                  value={bankTransferFormData.fromBankId}
+                  onChange={(e) => {
+                    setBankTransferFormData({ ...bankTransferFormData, fromBankId: e.target.value })
+                    if (bankTransferErrors.fromBankId) setBankTransferErrors({ ...bankTransferErrors, fromBankId: "" })
+                  }}
+                  options={[
+                    { value: "", label: "Select Bank Account" },
+                    ...accounts.filter(acc => acc.type === "bank").map(acc => ({
+                      value: acc._id,
+                      label: `${acc.name} (Balance: ₹${(acc.balance || 0).toLocaleString()})`,
+                    })),
+                  ]}
+                  error={bankTransferErrors.fromBankId}
+                />
+
+                <ModernSelect
+                  label="To Bank Account *"
+                  value={bankTransferFormData.toBankId}
+                  onChange={(e) => {
+                    setBankTransferFormData({ ...bankTransferFormData, toBankId: e.target.value })
+                    if (bankTransferErrors.toBankId) setBankTransferErrors({ ...bankTransferErrors, toBankId: "" })
+                  }}
+                  options={[
+                    { value: "", label: "Select Bank Account" },
+                    ...accounts.filter(acc => acc.type === "bank").map(acc => ({
+                      value: acc._id,
+                      label: `${acc.name} (Balance: ₹${(acc.balance || 0).toLocaleString()})`,
+                    })),
+                  ]}
+                  error={bankTransferErrors.toBankId}
+                />
+
+                <ModernInput
+                  label="Amount *"
+                  type="number"
+                  step="0.01"
+                  value={bankTransferFormData.amount}
+                  onChange={(e) => {
+                    setBankTransferFormData({ ...bankTransferFormData, amount: e.target.value })
+                    if (bankTransferErrors.amount) setBankTransferErrors({ ...bankTransferErrors, amount: "" })
+                  }}
+                  placeholder="e.g., 5000"
+                  icon={<DollarSign className="h-4 w-4" />}
+                  error={bankTransferErrors.amount}
+                />
+
+                <div className="flex gap-4 pt-4">
+                  <ModernButton type="submit" className="flex-1" loading={transferring} disabled={transferring}>
+                    Transfer Money
+                  </ModernButton>
+                  <ModernButton
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowTransferModal(false)
+                      setBankTransferFormData({ fromBankId: "", toBankId: "", amount: "" })
+                      setBankTransferErrors({})
+                    }}
+                    className="flex-1"
+                    disabled={transferring}
+                  >
+                    Cancel
+                  </ModernButton>
+                </div>
+              </form>
+            )}
           </DialogContent>
         </Dialog>
       </div>

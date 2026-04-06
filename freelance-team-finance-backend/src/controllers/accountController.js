@@ -756,3 +756,97 @@ exports.transferMoney = async (req, res, next) => {
     next(err);
   }
 };
+
+// Transfer money from bank to bank (simple ledger-only transfer)
+exports.transferBankToBank = async (req, res, next) => {
+  const useTx = await supportsTransactions();
+  let session = null;
+
+  try {
+    if (useTx) {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    }
+
+    const { fromBankId, toBankId, amount } = req.body;
+
+    if (!fromBankId || !toBankId || !amount) {
+      if (session) await session.abortTransaction();
+      return res.status(400).json({ error: 'Missing required fields: fromBankId, toBankId, amount' });
+    }
+    if (String(fromBankId) === String(toBankId)) {
+      if (session) await session.abortTransaction();
+      return res.status(400).json({ error: 'From and To bank accounts must be different' });
+    }
+
+    const amt = Math.abs(Number(amount || 0));
+    if (!amt || amt <= 0) {
+      if (session) await session.abortTransaction();
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
+    // Verify accounts exist and belong to user
+    const fromQuery = Account.findOne({ _id: fromBankId, user: req.user.userId, type: 'bank' });
+    const toQuery = Account.findOne({ _id: toBankId, user: req.user.userId, type: 'bank' });
+    const fromBank = session ? await fromQuery.session(session) : await fromQuery;
+    const toBank = session ? await toQuery.session(session) : await toQuery;
+
+    if (!fromBank) {
+      if (session) await session.abortTransaction();
+      return res.status(404).json({ error: 'From bank account not found' });
+    }
+    if (!toBank) {
+      if (session) await session.abortTransaction();
+      return res.status(404).json({ error: 'To bank account not found' });
+    }
+
+    // Debit from-bank, credit to-bank (two ledger rows)
+    await postAccountTxn({
+      userId: req.user.userId,
+      accountId: fromBankId,
+      type: 'debit',
+      amount: amt,
+      refType: 'transfer',
+      refId: null,
+      remark: `Bank transfer to ${toBank.name}`,
+    }, session);
+
+    await postAccountTxn({
+      userId: req.user.userId,
+      accountId: toBankId,
+      type: 'credit',
+      amount: amt,
+      refType: 'transfer',
+      refId: null,
+      remark: `Bank transfer from ${fromBank.name}`,
+    }, session);
+
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+    }
+
+    await logHistory({
+      userId: req.user.userId,
+      action: 'transfer',
+      entityType: 'Account',
+      entityId: fromBankId,
+      newValue: { fromBankId, toBankId, amount: amt },
+      description: `Transferred ${amt} from ${fromBank.name} to ${toBank.name}`,
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully transferred ₹${amt.toLocaleString('en-IN')} from ${fromBank.name} to ${toBank.name}`,
+      transfer: { fromBankId, toBankId, amount: amt },
+    });
+  } catch (err) {
+    if (session) {
+      try {
+        await session.abortTransaction();
+        session.endSession();
+      } catch {}
+    }
+    next(err);
+  }
+};
